@@ -163,9 +163,8 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:6px;backgroun
     <div class="brand">
       <div>
         <h1>BVFFB <span>Legacy</span></h1>
-        <p>Bella Vista Fantasy Football · Est. 2011 · Every season, every matchup, every grudge</p>
+        <p>Bella Vista Fantasy Football · Est. 2011</p>
       </div>
-      <div class="asof" id="asof"></div>
     </div>
     <nav class="tabs" id="tabs">
       <a href="#standings" data-g="history">League History</a>
@@ -463,7 +462,6 @@ function barChart({items, h=240, yFmt, color='var(--accent)', hl}){
 
 // ---------- views ----------
 const app=document.getElementById('app');
-document.getElementById('asof').innerHTML=`Data from ESPN · ${YEARS[0]}–${CUR}<br>${CUR} season through Week ${curWeek}`;
 
 function historyNav(on){
   const items=[['standings','All-Time Standings'],['champions','The Champions'],['ratings','League Ratings'],['season-'+(on&&on.startsWith('season')?on.split('-')[1]:CUR),'Season Archive'],['trends','League Trends']];
