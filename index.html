@@ -149,7 +149,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:6px;backgroun
 .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c)}
 .story{font-size:13px;color:var(--muted);white-space:normal;min-width:260px}
 .note{font-size:13px;color:var(--muted)}
-.hero{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px}
+.hero{display:grid;grid-template-columns:1fr;gap:28px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px}
 .big-banner{flex:none;width:190px;padding:18px 14px 40px;gap:6px}
 .big-banner .yr{font-size:48px}
 .big-banner .who{font-size:22px}
@@ -864,8 +864,8 @@ function vAch(){
 
 // ----- Home -----
 function vHome(){
-  const lastY=DONE[DONE.length-1], LS=SEASONS[lastY], ch=LS.champ, fin=LS.final;
   const S=curS, live=!S.complete;
+  const lw=Math.max(...S.games.map(g=>g.wk));
   const totPts=sum(GAMES.flatMap(g=>[g.hs,g.as]));
   const strip=[[YEARS.length,'Seasons'],[GAMES.length.toLocaleString(),'Matchups'],[C.length,'Managers all-time'],[f0(totPts),'Points scored'],[new Set(DONE.map(y=>SEASONS[y].champ.m)).size,'Different champions']];
   // standings snapshot
@@ -873,7 +873,7 @@ function vHome(){
   const streakOf=t=>{const c=C[t.m]; return c.curStreak||'';};
   const standRows=stand.map((t,k)=>`<tr><td class="r num">${live?t.seed:t.f}</td><td><b>${esc(t.n)}</b><div class="sub">${mlink(t.m)}</div></td><td class="r num">${rec(t.w,t.l,t.t)}</td><td class="r num">${f2(t.pf)}</td><td class="r num"><span class="${streakOf(t)[0]==='W'?'pos':'neg'}">${streakOf(t)}</span></td></tr>${live&&k===S.po-1?`<tr><td colspan="5" style="padding:0;border-bottom:2px dashed var(--accent)"></td></tr>`:''}`).join('');
   // latest week
-  const lw=Math.max(...S.games.map(g=>g.wk)), wg=S.games.filter(g=>g.wk===lw);
+  const wg=S.games.filter(g=>g.wk===lw);
   const wkHi=wg.flatMap(g=>[[g.ht,g.hs],[g.at,g.as]]).sort((a,b)=>b[1]-a[1])[0];
   const wkHtml=wg.map(g=>`<div class="gm"><span class="w">${esc(g.wt.n)}</span><span class="num w">${f2(g.ws)}</span><span class="l">${esc(g.lt.n)}</span><span class="num l">${f2(g.ls)}</span></div>`).join('');
   // streaks
@@ -903,11 +903,9 @@ function vHome(){
   const explore=[['#standings','All-Time Standings','Every manager, every record since 2011'],['#records','Record Book','Highs, lows, streaks and droughts'],['#franchise','Franchises','Career pages for every manager'],['#h2h','Head-to-Head','Who owns who'],['#achievements','Achievements','Trophies and follies'],['#season-'+CUR,`${CUR} Season`,'Standings and weekly results']];
   return `
   <section class="hero">
-    <a class="banner big-banner" href="#season-${lastY}"><span class="sub" style="color:#b8c0d4;text-transform:uppercase;letter-spacing:.08em;font-weight:700">Reigning Champion</span><span class="yr">${lastY}</span><span class="who">${esc(M[ch.m].name)}</span><span class="tm">${esc(ch.n)}</span></a>
     <div class="hero-copy">
-      <h2>${esc(M[ch.m].short)} holds the belt</h2>
-      <p class="lede">${esc(ch.n)} went ${rec(ch.w,ch.l,ch.t)} as the ${ord(ch.seed)} seed${fin?`, then beat ${esc(M[fin.lose].name)} ${f2(fin.ws)}–${f2(fin.ls)} in the title game`:''}. ${C[ch.m].titles.length>1?`That's ${C[ch.m].titles.length} rings (${C[ch.m].titles.join(', ')}).`:'First ring.'}</p>
-      ${live?`<p class="lede">The ${CUR} title is up for grabs. ${esc(M[stand[0].m].short)} leads the pack at ${rec(stand[0].w,stand[0].l,stand[0].t)} through Week ${lw}.</p>`:''}
+      <h2>${live?`${CUR} Season · Week ${lw}`:`${CUR} Final`}</h2>
+      ${live?`<p class="lede">${esc(M[stand[0].m].short)} leads the pack at ${rec(stand[0].w,stand[0].l,stand[0].t)}. ${S.reg-lw>0?`${S.reg-lw} week${S.reg-lw>1?'s':''} left in the regular season.`:'Regular season is done.'}</p>`:''}
       <div class="strip">${strip.map(s=>`<div><div class="v num">${s[0]}</div><div class="k">${s[1]}</div></div>`).join('')}</div>
     </div>
   </section>
