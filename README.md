@@ -1,4 +1,4 @@
-# BVFFB Legacy
+# BVFFB
 
 The history site for Bella Vista Fantasy Football: every season since 2011, pulled from ESPN.
 
