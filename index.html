@@ -149,6 +149,21 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:6px;backgroun
 .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c)}
 .story{font-size:13px;color:var(--muted);white-space:normal;min-width:260px}
 .note{font-size:13px;color:var(--muted)}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px}
+.big-banner{flex:none;width:190px;padding:18px 14px 40px;gap:6px}
+.big-banner .yr{font-size:48px}
+.big-banner .who{font-size:22px}
+.hero-copy{display:flex;flex-direction:column;gap:10px}
+.hero-copy h2{font-size:36px}
+.strip{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+.strip .v{font-family:var(--display);font-size:26px;font-weight:700;line-height:1}
+.strip .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.explore{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.explore a{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border-radius:8px;background:var(--navy);color:#fff;text-decoration:none;border-left:4px solid var(--accent)}
+.explore a b{font-family:var(--display);text-transform:uppercase;font-size:18px;letter-spacing:.03em}
+.explore a span{font-size:13px;color:#b8c0d4}
+.explore a:hover{border-left-color:var(--gold)}
+@media (max-width:700px){.hero{grid-template-columns:1fr;justify-items:center}.hero-copy h2{font-size:28px}}
 @media (max-width:600px){
   .brand h1{font-size:30px}
   .vs-head .big{font-size:42px}
@@ -162,11 +177,12 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:6px;backgroun
   <div class="top-inner">
     <div class="brand">
       <div>
-        <h1>BVFFB <span>Legacy</span></h1>
+        <h1><a href="#home" style="text-decoration:none;color:inherit">BVFFB <span>Legacy</span></a></h1>
         <p>Bella Vista Fantasy Football · Est. 2011</p>
       </div>
     </div>
     <nav class="tabs" id="tabs">
+      <a href="#home" data-g="home">Home</a>
       <a href="#standings" data-g="history">League History</a>
       <a href="#records" data-g="records">Record Book</a>
       <a href="#franchise" data-g="franchise">Franchises</a>
@@ -846,11 +862,80 @@ function vAch(){
   </div>`;
 }
 
+// ----- Home -----
+function vHome(){
+  const lastY=DONE[DONE.length-1], LS=SEASONS[lastY], ch=LS.champ, fin=LS.final;
+  const S=curS, live=!S.complete;
+  const totPts=sum(GAMES.flatMap(g=>[g.hs,g.as]));
+  const strip=[[YEARS.length,'Seasons'],[GAMES.length.toLocaleString(),'Matchups'],[C.length,'Managers all-time'],[f0(totPts),'Points scored'],[new Set(DONE.map(y=>SEASONS[y].champ.m)).size,'Different champions']];
+  // standings snapshot
+  const stand=S.list.slice().sort((a,b)=>live?(a.seed-b.seed):(a.f-b.f));
+  const streakOf=t=>{const c=C[t.m]; return c.curStreak||'';};
+  const standRows=stand.map((t,k)=>`<tr><td class="r num">${live?t.seed:t.f}</td><td><b>${esc(t.n)}</b><div class="sub">${mlink(t.m)}</div></td><td class="r num">${rec(t.w,t.l,t.t)}</td><td class="r num">${f2(t.pf)}</td><td class="r num"><span class="${streakOf(t)[0]==='W'?'pos':'neg'}">${streakOf(t)}</span></td></tr>${live&&k===S.po-1?`<tr><td colspan="5" style="padding:0;border-bottom:2px dashed var(--accent)"></td></tr>`:''}`).join('');
+  // latest week
+  const lw=Math.max(...S.games.map(g=>g.wk)), wg=S.games.filter(g=>g.wk===lw);
+  const wkHi=wg.flatMap(g=>[[g.ht,g.hs],[g.at,g.as]]).sort((a,b)=>b[1]-a[1])[0];
+  const wkHtml=wg.map(g=>`<div class="gm"><span class="w">${esc(g.wt.n)}</span><span class="num w">${f2(g.ws)}</span><span class="l">${esc(g.lt.n)}</span><span class="num l">${f2(g.ls)}</span></div>`).join('');
+  // streaks
+  const act=C.filter(c=>c.active&&c.curStreak);
+  const hot=act.filter(c=>c.curStreak[0]==='W').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).slice(0,3);
+  const cold=act.filter(c=>c.curStreak[0]==='L').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).slice(0,3);
+  const sRow=(c,cls)=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(c.i)}<div class="sub">${esc(c.curTeam)}</div></span><span class="val ${cls}">${c.curStreak}</span></div>`;
+  // records set this season (top 5 all-time single-game)
+  const SG=GAMES.filter(g=>!g.multi);
+  const allScores=SG.flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,g},{m:g.a,t:g.at,s:g.as,g}]).sort((a,b)=>b.s-a.s);
+  const top10=allScores.slice(0,10);
+  const curHigh=allScores.filter(x=>x.g.y===CUR)[0];
+  const curRank=allScores.indexOf(curHigh)+1;
+  const allHi=allScores[0], blow=SG.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin)[0];
+  const mostT=C.slice().sort((a,b)=>b.titles.length-a.titles.length)[0];
+  const watch=[
+    ['All-time high score',f2(allHi.s),`${M[allHi.m].short} · ${allHi.g.y} Wk ${allHi.g.wk}`],
+    ['Biggest blowout',f2(blow.margin),`${M[blow.win].short} over ${M[blow.lose].short} · ${blow.y}`],
+    ['Most titles',mostT.titles.length,`${mostT.name} · ${mostT.titles.join(', ')}`],
+    [`Best score of ${CUR}`,f2(curHigh.s),`${M[curHigh.m].short} · Wk ${curHigh.g.wk} · #${curRank} all-time`],
+  ];
+  // rivalry spotlight: closest long-running active rivalry
+  let riv=null; ACTIVE.forEach(a=>ACTIVE.forEach(b=>{ if(a.i<b.i){const h=a.h2h[b.i]; if(h&&h.n>=12){const score=Math.abs(h.w-h.l)*10-h.n; if(!riv||score<riv.score)riv={a,b,h,score};}}}));
+  const rivHtml=riv?`<div class="vs-head" style="margin:6px 0 10px"><div class="nm" style="font-size:20px">${mlink(riv.a.i,riv.a.m.short)}</div><div class="big num" style="font-size:44px">${riv.h.w}–${riv.h.l}</div><div class="nm" style="font-size:20px">${mlink(riv.b.i,riv.b.m.short)}</div></div><p class="note" style="text-align:center;margin:0 0 10px">${riv.h.n} meetings since ${riv.h.list[0].y}, separated by ${Math.abs(riv.h.w-riv.h.l)||'nothing'}${riv.h.w===riv.h.l?'':` game${Math.abs(riv.h.w-riv.h.l)>1?'s':''}`}. Avg score ${f1(riv.h.pf/riv.h.n)}–${f1(riv.h.pa/riv.h.n)}.</p><div style="text-align:center"><a class="chip" href="#versus-${riv.a.i}-${riv.b.i}">Full breakdown</a></div>`:'';
+  // drought clock
+  const drought=ACTIVE.slice().sort((a,b)=>b.curDrought-a.curDrought||a.titles.length-b.titles.length).slice(0,5);
+  const explore=[['#standings','All-Time Standings','Every manager, every record since 2011'],['#records','Record Book','Highs, lows, streaks and droughts'],['#franchise','Franchises','Career pages for every manager'],['#h2h','Head-to-Head','Who owns who'],['#achievements','Achievements','Trophies and follies'],['#season-'+CUR,`${CUR} Season`,'Standings and weekly results']];
+  return `
+  <section class="hero">
+    <a class="banner big-banner" href="#season-${lastY}"><span class="sub" style="color:#b8c0d4;text-transform:uppercase;letter-spacing:.08em;font-weight:700">Reigning Champion</span><span class="yr">${lastY}</span><span class="who">${esc(M[ch.m].name)}</span><span class="tm">${esc(ch.n)}</span></a>
+    <div class="hero-copy">
+      <h2>${esc(M[ch.m].short)} holds the belt</h2>
+      <p class="lede">${esc(ch.n)} went ${rec(ch.w,ch.l,ch.t)} as the ${ord(ch.seed)} seed${fin?`, then beat ${esc(M[fin.lose].name)} ${f2(fin.ws)}–${f2(fin.ls)} in the title game`:''}. ${C[ch.m].titles.length>1?`That's ${C[ch.m].titles.length} rings (${C[ch.m].titles.join(', ')}).`:'First ring.'}</p>
+      ${live?`<p class="lede">The ${CUR} title is up for grabs. ${esc(M[stand[0].m].short)} leads the pack at ${rec(stand[0].w,stand[0].l,stand[0].t)} through Week ${lw}.</p>`:''}
+      <div class="strip">${strip.map(s=>`<div><div class="v num">${s[0]}</div><div class="k">${s[1]}</div></div>`).join('')}</div>
+    </div>
+  </section>
+  <div class="grid2">
+    <div class="card"><div class="head" style="margin-bottom:10px"><h3>${CUR} Standings</h3><a class="chip" href="#season-${CUR}">Full season</a></div>
+      <div class="tblwrap"><table><thead><tr><th class="r">#</th><th>Team</th><th class="r">W-L</th><th class="r">PF</th><th class="r">Strk</th></tr></thead><tbody>${standRows}</tbody></table></div>
+      ${live?`<p class="note">Dashed line marks the playoff cut (top ${S.po}).</p>`:''}</div>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="card"><div class="head" style="margin-bottom:6px"><h3>Week ${lw} Results</h3><span class="sub">High score: ${esc(wkHi[0].n)} ${f2(wkHi[1])}</span></div>${wkHtml}</div>
+      <div class="card"><h3>Rivalry Spotlight</h3>${rivHtml}</div>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card"><h3>Heating Up</h3><div class="rec-list">${hot.map(c=>sRow(c,'pos')).join('')||'<p class="note">Nobody on a win streak.</p>'}</div></div>
+    <div class="card"><h3>Ice Cold</h3><div class="rec-list">${cold.map(c=>sRow(c,'neg')).join('')||'<p class="note">Nobody on a skid.</p>'}</div></div>
+    <div class="card"><h3>Title Drought Clock</h3><div class="rec-list">${drought.map(c=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(c.i)}<div class="sub">${c.titles.length?'last title '+c.titles[c.titles.length-1]:'never won · since '+c.years[0]}</div></span><span class="val">${c.curDrought} yrs</span></div>`).join('')}</div></div>
+  </div>
+  <div class="card"><div class="head" style="margin-bottom:10px"><h3>Record Watch</h3><a class="chip" href="#records">Record Book</a></div><div class="tiles">${watch.map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v num">${t[1]}</div><div class="sub">${esc(String(t[2]))}</div></div>`).join('')}</div></div>
+  <div class="card"><h3>The Rafters</h3>${rafters()}</div>
+  <div class="explore">${explore.map(e=>`<a href="${e[0]}"><b>${e[1]}</b><span>${e[2]}</span></a>`).join('')}</div>`;
+}
+
 // ---------- router ----------
 function route(){
-  const h=(location.hash||'#standings').slice(1);
+  const h=(location.hash||'#home').slice(1);
   let g='history', html='';
-  if(h==='standings'||h==='') html=vStandings();
+  if(h==='home'||h===''){g='home'; html=vHome();}
+  else if(h==='standings') html=vStandings();
   else if(h==='champions') html=vChampions();
   else if(h==='ratings') html=vRatings();
   else if(h==='trends') html=vTrends();
