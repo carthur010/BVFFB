@@ -164,7 +164,21 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:6px;backgroun
 .explore a span{font-size:13px;color:#b8c0d4}
 .explore a:hover{border-left-color:var(--gold)}
 @media (max-width:700px){.hero{grid-template-columns:1fr;justify-items:center}.hero-copy h2{font-size:28px}}
+td.pin,th.pin{position:sticky;left:0;z-index:1;background:var(--surface);box-shadow:1px 0 0 var(--line)}
+th.pin{z-index:2;background:var(--soft)}
+tbody tr:hover td.pin{background:var(--soft)}
+button.badge{cursor:pointer;font-family:inherit;color:var(--ink)}
+button.badge:hover,button.badge.on{border-color:var(--accent)}
+button.badge.on{background:var(--soft)}
+.bdetail{margin-top:10px;padding:12px 14px;border-radius:8px;background:var(--soft);font-size:13.5px}
+.bdetail b{font-family:var(--display);text-transform:uppercase;font-size:16px;letter-spacing:.03em}
+.bdetail ul{margin:6px 0 0;padding-left:18px;columns:2 220px;column-gap:24px}
+.bdetail li{margin:2px 0;break-inside:avoid}
+.more-toggle{display:flex;justify-content:flex-end;margin-bottom:8px}
 @media (max-width:600px){
+  nav.tabs{flex-wrap:wrap;gap:4px;padding-bottom:8px;overflow:visible}
+  nav.tabs a{font-size:14px;padding:6px 10px;border-radius:6px}
+  .top-inner{gap:10px}
   .brand h1{font-size:30px}
   .vs-head .big{font-size:42px}
   .vs-head .nm{font-size:18px}
@@ -431,9 +445,18 @@ function tableInner(id){
   const st=TBL[id], col=st.cols.find(c=>c.k===st.sortK);
   const rows=st.rows.slice();
   if(col){ const v=col.sv||(r=>r[col.k]); rows.sort((a,b)=>{let x=v(a),y=v(b); if(typeof x==='string')return st.dir==='asc'?x.localeCompare(y):y.localeCompare(x); x=isNaN(x)?-Infinity:x; y=isNaN(y)?-Infinity:y; return st.dir==='asc'?x-y:y-x;}); }
-  return `<table><thead><tr>${st.cols.map(c=>`<th class="${c.r?'r ':''}${c.nosort?'':'s '}${c.k===st.sortK?'sorted':''}" ${c.nosort?'':`data-t="${id}" data-k="${c.k}" tabindex="0"`}>${c.label}${c.k===st.sortK?(st.dir==='asc'?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ix)=>`<tr>${st.cols.map(c=>`<td class="${c.r?'r num':''}${c.cls?' '+c.cls:''}">${c.f?c.f(r,ix):esc(r[c.k])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  return `<table><thead><tr>${st.cols.map(c=>`<th class="${c.r?'r ':''}${c.pin?'pin ':''}${c.nosort?'':'s '}${c.k===st.sortK?'sorted':''}" ${c.nosort?'':`data-t="${id}" data-k="${c.k}" tabindex="0"`}>${c.label}${c.k===st.sortK?(st.dir==='asc'?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ix)=>`<tr>${st.cols.map(c=>`<td class="${c.r?'r num':''}${c.pin?' pin':''}${c.cls?' '+c.cls:''}">${c.f?c.f(r,ix):esc(r[c.k])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 document.addEventListener('click',e=>{
+  const bb=e.target.closest('button[data-badge]');
+  if(bb){ const wrap=bb.closest('.badgewrap'), det=wrap.querySelector('.bdetail'), b=BK[bb.dataset.badge], c=C[+bb.dataset.m];
+    const open=bb.classList.contains('on');
+    wrap.querySelectorAll('button.badge').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-expanded','false');});
+    if(open){det.hidden=true;return;}
+    bb.classList.add('on'); bb.setAttribute('aria-expanded','true');
+    const list=c.badges[b.k];
+    det.innerHTML=`<b>${b.name}</b> <span class="sub">· ${esc(b.d)}</span><ul>${list.map(x=>`<li class="num">${esc(String(x))}</li>`).join('')}</ul>`;
+    det.hidden=false; return; }
   const th=e.target.closest('th[data-t]'); if(!th)return;
   sortTh(th);
 });
@@ -466,13 +489,15 @@ function lineChart({series, xs, yMin, yMax, invert, yFmt, h=260, yTicks}){
   });
   return `<div class="chart">${s}</svg></div>`;
 }
-function barChart({items, h=240, yFmt, color='var(--accent)', hl}){
+function barChart({items, h=240, yFmt, color='var(--accent)', hl, ref, low}){
   const W=760,H=h,L=46,R=10,T=14,B=30, iw=W-L-R, ih=H-T-B;
-  const hi=Math.max(...items.map(i=>i.v))*1.1, bw=iw/items.length;
+  const hi=Math.max(...items.map(i=>Math.max(i.v,i.ref||0)))*1.1, bw=iw/items.length;
   const y=v=>T+ih-v/hi*ih;
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img">`;
   for(let k=0;k<=4;k++){const t=hi*k/4; s+=`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-6}" y="${y(t)+4}" font-size="11" text-anchor="end" fill="var(--muted)">${yFmt?yFmt(t):Math.round(t)}</text>`;}
-  items.forEach((it,k)=>{const x=L+k*bw+bw*.15; s+=`<rect x="${x}" y="${y(it.v)}" width="${bw*.7}" height="${T+ih-y(it.v)}" rx="2" fill="${hl&&hl(it)?'var(--gold)':color}"><title>${esc(it.label)}: ${yFmt?yFmt(it.v):it.v}</title></rect><text x="${x+bw*.35}" y="${H-8}" font-size="11" text-anchor="middle" fill="var(--muted)">${esc(it.x)}</text>`;});
+  items.forEach((it,k)=>{const x=L+k*bw+bw*.15; s+=`<rect x="${x}" y="${y(it.v)}" width="${bw*.7}" height="${T+ih-y(it.v)}" rx="2" fill="${hl&&hl(it)?'var(--gold)':(low&&low(it)?'var(--muted)':color)}" ${low&&low(it)?'opacity=".55"':''}><title>${esc(it.label)}: ${yFmt?yFmt(it.v):it.v}</title></rect><text x="${x+bw*.35}" y="${H-8}" font-size="11" text-anchor="middle" fill="var(--muted)">${esc(it.x)}</text>`;});
+  if(items.some(i=>i.ref!=null)){ const d=items.map((it,k)=>`${k?'L':'M'}${L+k*bw+bw*.1},${y(it.ref)} L${L+k*bw+bw*.9},${y(it.ref)}`).join(' ');
+    s+=`<path d="${d}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/>`; }
   return `<div class="chart">${s}</svg></div>`;
 }
 
@@ -487,36 +512,36 @@ function rafters(){
   return `<div class="rafters">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].short)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
 }
 
+let STAND_MORE=false;
 function vStandings(){
   const cols=[
     {k:'rank',label:'#',r:1,asc:1,f:r=>r.rank},
-    {k:'name',label:'Manager',f:r=>`${mlink(r.i)}<div class="sub">${esc(r.curTeam)}${r.active?'':' · former'}</div>`,sv:r=>r.name,asc:1},
+    {k:'name',label:'Manager',pin:1,f:r=>`${mlink(r.i)}<div class="sub">${esc(r.curTeam)}${r.active?'':' · former'}</div>`,sv:r=>r.name,asc:1},
     {k:'seasons',label:'Yrs',r:1},
     {k:'rec',label:'W-L-T',r:1,f:r=>rec(r.w,r.l,r.t),sv:r=>r.w},
     {k:'wp',label:'Win %',r:1,f:r=>pct(r.wp)},
-    {k:'pf',label:'PF',r:1,f:r=>f0(r.pf)},
-    {k:'pa',label:'PA',r:1,f:r=>f0(r.pa)},
+    {k:'pf',label:'PF',r:1,f:r=>f0(r.pf),x:1},
+    {k:'pa',label:'PA',r:1,f:r=>f0(r.pa),x:1},
     {k:'ppg',label:'PF/G',r:1,f:r=>f1(r.ppg)},
-    {k:'apPct',label:'All-Play',r:1,f:r=>pct(r.apPct)},
-    {k:'luck',label:'Luck',r:1,f:r=>`<span class="${r.luck>=0?'pos':'neg'}">${sgn(r.luck)}</span>`},
-    {k:'po',label:'Playoff W-L',r:1,f:r=>rec(r.pow,r.pol),sv:r=>r.pow},
+    {k:'apPct',label:'All-Play',r:1,f:r=>pct(r.apPct),x:1},
+    {k:'luck',label:'Luck',r:1,f:r=>`<span class="${r.luck>=0?'pos':'neg'}">${sgn(r.luck)}</span>`,x:1},
+    {k:'po',label:'Playoff W-L',r:1,f:r=>rec(r.pow,r.pol),sv:r=>r.pow,x:1},
     {k:'apps',label:'Playoffs',r:1,f:r=>`${r.poApps.length}<span class="sub">/${r.eligible}</span>`,sv:r=>r.poApps.length},
     {k:'tt',label:'Titles',r:1,f:r=>r.titles.length?`<b>${r.titles.length}</b>`:'0',sv:r=>r.titles.length*100+r.finals.length},
     {k:'fin',label:'Finals',r:1,f:r=>r.finals.length,sv:r=>r.finals.length},
     {k:'best',label:'Best',r:1,asc:1,f:r=>ord(r.best)},
-    {k:'avgFin',label:'Avg Fin',r:1,asc:1,f:r=>f1(r.avgFin)},
-  ];
+    {k:'avgFin',label:'Avg Fin',r:1,asc:1,f:r=>f1(r.avgFin),x:1},
+  ].filter(c=>STAND_MORE||!c.x);
   return `${historyNav('standings')}
-  <div class="head"><div><h2>All-Time Standings</h2><p class="lede">Every manager who has ever held a BVFFB franchise, ${YEARS[0]} to today. Records are regular season; playoffs are tracked separately. All-Play is your record if you played every team every week. Luck is actual wins minus All-Play expected wins.</p></div></div>
-  <div class="card">${rafters()}</div>
-  <div class="card">${table('t-stand',cols,C,'rank','asc')}</div>`;
+  <div class="head"><div><h2>All-Time Standings</h2><p class="lede">Every manager who has ever held a BVFFB franchise, ${YEARS[0]} to today. Records are regular season; playoffs are tracked separately. All-Play is your record if you played every team every week. Luck is actual wins minus All-Play expected wins. Tap More stats for points, All-Play, luck and playoff records.</p></div></div>
+  <div class="card"><div class="more-toggle"><label class="toggle"><input type="checkbox" id="st-more" ${STAND_MORE?'checked':''}> More stats</label></div>${table('t-stand',cols,C,'rank','asc')}</div>`;
 }
 
 function vChampions(){
   const rows=DONE.slice().reverse().map(y=>{const S=SEASONS[y];return {y,S};});
   const cols=[
     {k:'y',label:'Season',f:r=>`<a class="mgr" href="#season-${r.y}">${r.y}</a>`},
-    {k:'c',label:'Champion',nosort:1,f:r=>`${mlink(r.S.champ.m)}<div class="sub">${esc(r.S.champ.n)} · ${rec(r.S.champ.w,r.S.champ.l,r.S.champ.t)}${r.S.po?` · ${r.S.champ.seed} seed`:''}</div>`},
+    {k:'c',label:'Champion',pin:1,nosort:1,f:r=>`${mlink(r.S.champ.m)}<div class="sub">${esc(r.S.champ.n)} · ${rec(r.S.champ.w,r.S.champ.l,r.S.champ.t)}${r.S.po?` · ${r.S.champ.seed} seed`:''}</div>`},
     {k:'ru',label:'Runner-up',nosort:1,f:r=>`${mlink(r.S.ru.m)}<div class="sub">${esc(r.S.ru.n)}</div>`},
     {k:'fs',label:'Title Game',nosort:1,f:r=>r.S.final?`<span class="num">${f2(r.S.final.ws)} – ${f2(r.S.final.ls)}</span>${r.S.twoWk?'<div class="sub">two-week final</div>':''}`:'<span class="sub">No playoff that year</span>'},
     {k:'ts',label:'#1 Seed',nosort:1,f:r=>mlink(r.S.topSeed.m,M[r.S.topSeed.m].short)},
@@ -549,7 +574,7 @@ function story(c){
 function vRatings(){
   const cols=[
     {k:'rank',label:'Rank',r:1,asc:1},
-    {k:'name',label:'Manager',f:r=>mlink(r.i),sv:r=>r.name,asc:1},
+    {k:'name',label:'Manager',pin:1,f:r=>mlink(r.i),sv:r=>r.name,asc:1},
     {k:'legacy',label:'Legacy Score',r:1,f:r=>`<b>${f1(r.legacy)}</b>`},
     {k:'tt',label:'Titles',r:1,f:r=>r.titles.length,sv:r=>r.titles.length},
     {k:'ru',label:'Runner-up',r:1,f:r=>r.rus.length,sv:r=>r.rus.length},
@@ -571,7 +596,7 @@ function vSeason(y){
   const standings=S.list.slice().sort((a,b)=>S.complete?a.f-b.f:a.seed-b.seed);
   const cols=[
     {k:'f',label:S.complete?'Finish':'Rank',r:1,asc:1,f:r=>S.complete?ord(r.f):ord(r.seed),sv:r=>S.complete?r.f:r.seed},
-    {k:'n',label:'Team',f:r=>`<b>${esc(r.n)}</b><div class="sub">${mlink(r.m)}</div>`,asc:1},
+    {k:'n',label:'Team',pin:1,f:r=>`<b>${esc(r.n)}</b><div class="sub">${mlink(r.m)}</div>`,asc:1},
     {k:'seed',label:'Seed',r:1,asc:1},
     {k:'wp',label:'Record',r:1,f:r=>rec(r.w,r.l,r.t)},
     {k:'pf',label:'PF',r:1,f:r=>f2(r.pf)},
@@ -715,7 +740,7 @@ function vRecords(sec){
 function badgeChips(c,compact){
   const ks=BADGES.filter(b=>c.badges[b.k]);
   if(!ks.length) return '<span class="note">No badges yet.</span>';
-  return `<div class="badges">${ks.map(b=>`<span class="badge ${b.type==='f'?'f':b.type==='t'?'t':''}" title="${esc(b.d)}${compact?'':' · '+esc(c.badges[b.k].slice(0,12).join('; '))+(c.badges[b.k].length>12?'…':'')}"><i>${b.ab}</i>${b.name}${c.badges[b.k].length>1?` <b>×${c.badges[b.k].length}</b>`:''}</span>`).join('')}</div>`;
+  return `<div class="badgewrap"><div class="badges">${ks.map(b=>`<button type="button" class="badge ${b.type==='f'?'f':b.type==='t'?'t':''}" data-badge="${b.k}" data-m="${c.i}" aria-expanded="false"><i>${b.ab}</i>${b.name}${c.badges[b.k].length>1?` <b>×${c.badges[b.k].length}</b>`:''}</button>`).join('')}</div><div class="bdetail" hidden></div></div>`;
 }
 function vFranchise(i){
   const sel=`<div class="ctrl"><label for="fsel">Franchise</label><select id="fsel">${RANKED.map(c=>`<option value="${c.i}" ${c.i===+i?'selected':''}>${esc(c.name)}${c.active?'':' (former)'}</option>`).join('')}</select></div>`;
@@ -746,7 +771,7 @@ function vFranchise(i){
   const q=opp.filter(o=>o.n>=5);
   const fav=q.slice().sort((a,b)=>b.wp-a.wp)[0], nem=q.slice().sort((a,b)=>a.wp-b.wp)[0];
   const ocols=[
-    {k:'o',label:'Opponent',f:r=>mlink(r.o),sv:r=>M[r.o].name,asc:1},
+    {k:'o',label:'Opponent',pin:1,f:r=>mlink(r.o),sv:r=>M[r.o].name,asc:1},
     {k:'n',label:'GP',r:1},
     {k:'wp',label:'W-L',r:1,f:r=>rec(r.w,r.l,r.t)},
     {k:'pct',label:'Win %',r:1,f:r=>`<span class="${r.wp>.5?'pos':r.wp<.5?'neg':''}">${pct(r.wp)}</span>`,sv:r=>r.wp},
@@ -756,7 +781,8 @@ function vFranchise(i){
   ];
   const doneT=c.teams.filter(t=>SEASONS[t.y].complete||t.y===CUR);
   const chart=lineChart({xs:c.years,series:[{name:'Finish',color:'var(--accent)',pts:c.teams.map(t=>[t.y,SEASONS[t.y].complete?t.f:null,t.n])},{name:'Regular season seed',color:'var(--muted)',dash:1,w:2,pts:c.teams.map(t=>[t.y,t.seed,t.n])}],yMin:1,yMax:12,invert:1,yTicks:[1,3,6,9,12],yFmt:v=>ord(Math.round(v)),h:230});
-  const rel=barChart({items:c.teams.map(t=>({x:"'"+String(t.y).slice(2),label:`${t.y} ${t.n}`,v:Math.max(0,t.ppg)})),yFmt:v=>v.toFixed(0),h:200,hl:t=>false});
+  const rel=barChart({items:c.teams.map(t=>({x:"'"+String(t.y).slice(2),label:`${t.y} ${t.n}: ${f1(t.ppg)} per game vs league ${f1(SEASONS[t.y].lgPpg)}`,v:Math.max(0,t.ppg),ref:SEASONS[t.y].lgPpg})),yFmt:v=>v.toFixed(0),h:200,low:it=>it.v<it.ref});
+  const above=c.teams.filter(t=>t.ppg>=SEASONS[t.y].lgPpg).length;
   const sg=c.games.filter(x=>!x.g.multi);
   const bestG=sg.slice().sort((a,b)=>b.ms-a.ms)[0], worstG=sg.slice().sort((a,b)=>a.ms-b.ms)[0];
   const bigW=sg.filter(x=>x.r==='W').sort((a,b)=>(b.ms-b.os)-(a.ms-a.os))[0], badL=sg.filter(x=>x.r==='L').sort((a,b)=>(a.ms-a.os)-(b.ms-b.os))[0];
@@ -767,7 +793,7 @@ function vFranchise(i){
   <div class="card"><h3>Trophies & Achievements</h3>${badgeChips(c)}</div>
   <div class="grid2">
     <div class="card"><h3>Career Arc</h3><div class="legend"><span style="--c:var(--accent)">Final finish</span><span style="--c:var(--muted)">Regular season seed</span></div>${chart}</div>
-    <div class="card"><h3>Points Per Game by Season</h3>${rel}<p class="note">League average across his seasons: ${f1(avg(c.teams.map(t=>SEASONS[t.y].lgPpg)))} per game.</p></div>
+    <div class="card"><h3>Points Per Game by Season</h3>${rel}<div class="legend"><span style="--c:var(--accent)">Beat the league average</span><span style="--c:var(--muted)">Below average</span><span style="--c:var(--ink)">League average (dashed)</span></div><p class="note">Above the league average in ${above} of ${c.teams.length} seasons.</p></div>
   </div>
   <div class="card"><h3>Season by Season</h3>${table('t-flog',cols,c.teams.slice().reverse(),'y','desc')}</div>
   <div class="card"><h3>Rivalries</h3>
@@ -831,7 +857,7 @@ function vVersusBody(ai,bi,embedded){
     <div class="tiles" style="margin-top:16px">
       <div class="tile"><div class="k">Regular season</div><div class="v num">${rw}-${rl}</div></div>
       <div class="tile"><div class="k">Playoffs</div><div class="v num">${h.pw}-${h.pl}</div></div>
-      <div class="tile"><div class="k">Avg score</div><div class="v num">${h.n?f1(h.pf/h.n)+'–'+f1(h.pa/h.n):'–'}</div></div>
+      <div class="tile"><div class="k">Avg score</div><div class="v num" style="font-size:22px;white-space:nowrap">${h.n?f1(h.pf/h.n)+' – '+f1(h.pa/h.n):'–'}</div></div>
       <div class="tile"><div class="k">Current streak</div><div class="v" style="font-size:20px">${esc(streak)}</div></div>
       ${bigA?`<div class="tile"><div class="k">${esc(a.m.short)} biggest win</div><div class="v num">${sgn(bigA.ms-bigA.os)}</div><div class="sub">${bigA.y} Wk ${bigA.wk}</div></div>`:''}
       ${bigB?`<div class="tile"><div class="k">${esc(b.m.short)} biggest win</div><div class="v num">${sgn(bigB.os-bigB.ms)}</div><div class="sub">${bigB.y} Wk ${bigB.wk}</div></div>`:''}
@@ -852,8 +878,7 @@ function vAch(){
   const catalog=type=>BADGES.filter(b=>type==='f'?b.type==='f':b.type!=='f').map(b=>{
     const holders=C.filter(c=>c.badges[b.k]).sort((x,y)=>y.badges[b.k].length-x.badges[b.k].length);
     return `<div class="rec-row" style="grid-template-columns:30px 1fr auto"><span class="badge ${b.type==='f'?'f':b.type==='t'?'t':''}" style="padding:0;border:0"><i>${b.ab}</i></span><span><b>${b.name}</b><div class="sub">${b.d}</div><div class="sub" style="margin-top:3px">${holders.length?holders.slice(0,6).map(c=>`${mlink(c.i,c.m.short)} ${c.badges[b.k].length}`).join(' · '):'Nobody yet'}</div></span><span class="val">${sum(holders.map(c=>c.badges[b.k].length))}</span></div>`;}).join('');
-  return `<div class="head"><div><h2>Achievements</h2><p class="lede">Trophies for the good years and receipts for the bad ones. Every badge is earned from the actual results, and hovering a badge on a franchise page shows exactly when it happened.</p></div></div>
-  <div class="card"><h3>The Rafters</h3>${rafters()}</div>
+  return `<div class="head"><div><h2>Achievements</h2><p class="lede">Trophies for the good years and receipts for the bad ones. Every badge is earned from the actual results, and tapping any badge shows exactly when it happened.</p></div></div>
   <h3>Trophy Case</h3>
   <div class="grid3">${RANKED.map(card).join('')}</div>
   <div class="grid2">
@@ -952,6 +977,7 @@ function wire(){
   const fs=document.getElementById('fsel'); if(fs) fs.onchange=()=>{location.hash='franchise-'+fs.value;};
   const va=document.getElementById('vs-a'), vb=document.getElementById('vs-b');
   if(va&&vb){ const go=()=>{ if(location.hash.startsWith('#versus')) location.hash=`versus-${va.value}-${vb.value}`; else { document.getElementById('versus').outerHTML=vVersusBody(+va.value,+vb.value,true); wire(); } }; va.onchange=go; vb.onchange=go; }
+  const sm=document.getElementById('st-more'); if(sm) sm.onchange=()=>{STAND_MORE=sm.checked; route();};
   const ha=document.getElementById('h-act'), hp=document.getElementById('h-po');
   if(ha) ha.onchange=()=>{H2H_OPTS.active=ha.checked; route();};
   if(hp) hp.onchange=()=>{H2H_OPTS.po=hp.checked; route();};
