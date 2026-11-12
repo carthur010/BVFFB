@@ -104,7 +104,15 @@ def main():
                                                     a["teamId"], num(r2(a.get("totalPoints"))), "R" if tier == "NONE" else "P"]))
         out[str(y)] = {"reg": s.get("matchupPeriodCount"), "po": s.get("playoffTeamCount"), "T": teams, "G": ";".join(games)}
 
-    OUT.write_text(json.dumps({"M": managers, "S": out}, separators=(",", ":"), ensure_ascii=False))
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # keep the old stamp when nothing else changed, so unchanged refreshes don't create commits
+    try:
+        prev = json.loads(OUT.read_text())
+        if prev.get("M") == managers and prev.get("S") == out and prev.get("U"):
+            stamp = prev["U"]
+    except Exception:
+        pass
+    OUT.write_text(json.dumps({"M": managers, "S": out, "U": stamp}, separators=(",", ":"), ensure_ascii=False))
     print(f"Wrote {OUT} · {len(years)} seasons · {len(managers)} managers")
 
 
