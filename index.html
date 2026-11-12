@@ -4,6 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BVFFB</title>
+<meta name="description" content="Bella Vista Fantasy Football since 2011: every champion, record, rivalry and the current season.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="BVFFB">
+<meta property="og:title" content="BVFFB · Bella Vista Fantasy Football">
+<meta property="og:description" content="Every champion, record and rivalry since 2011, plus live standings and playoff odds.">
+<meta property="og:url" content="https://carthur010.github.io/BVFFB/">
+<meta property="og:image" content="https://carthur010.github.io/BVFFB/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BVFFB · Bella Vista Fantasy Football">
+<meta name="twitter:description" content="Every champion, record and rivalry since 2011, plus live standings and playoff odds.">
+<meta name="twitter:image" content="https://carthur010.github.io/BVFFB/og.png">
+<meta name="theme-color" content="#16213e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M8 4h48v52l-24-10L8 56z' fill='%2316213e'/%3E%3Crect x='8' y='4' width='48' height='6' fill='%23c8102e'/%3E%3Ctext x='32' y='38' font-family='Arial' font-weight='700' font-size='20' text-anchor='middle' fill='%23c99a28'%3EBV%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -181,6 +196,17 @@ a.riv:hover{border-left-color:var(--gold)}
 .mtg-a{border-top-color:var(--accent)}
 .mtg-b{border-top-color:var(--navy)}
 @media (max-width:800px){.riv-wrap{grid-template-columns:1fr}}
+.banner .bdet{font-size:11px;color:#8f98b0;line-height:1.2;font-variant-numeric:tabular-nums}
+.banner .bdet:first-of-type{margin-top:2px}
+.wire{display:flex;flex-direction:column}
+.wire-item{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.wire-item:last-child{border-bottom:0}
+.wtag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:4px;text-align:center}
+.w-rec{background:var(--accent);color:#fff}.w-bad{background:var(--bad-bg);color:var(--bad)}.w-good{background:var(--good-bg);color:var(--good)}.w-gold{background:var(--gold);color:#fff}.w-neu{background:var(--soft);color:var(--ink)}
+.ms-row{padding:8px 0;border-bottom:1px solid var(--line)}
+.ms-row:last-child{border-bottom:0}
+.bar{height:6px;border-radius:3px;background:var(--soft);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gold);border-radius:3px}
 .mu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
 .mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:12px}
 .mu-side{display:flex;flex-direction:column;gap:4px}
@@ -575,7 +601,7 @@ function historyNav(on){
   return `<div class="subtabs">${items.map(([h,l])=>`<a class="chip ${on&&(on===h||(h.startsWith('season')&&on.startsWith('season')))?'on':''}" href="#${h}">${l}</a>`).join('')}</div>`;
 }
 function rafters(wrap){
-  return `<div class="rafters${wrap?' rafters-wrap':''}">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
+  return `<div class="rafters${wrap?' rafters-wrap':''}">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}" title="${esc(`${y}: ${M[t.m].name}, ${t.n}. ${rec(t.w,t.l,t.t)}${SEASONS[y].po?`, ${ord(t.seed)} seed`:''}.${SEASONS[y].final?` Beat ${M[SEASONS[y].final.lose].name} ${f2(SEASONS[y].final.ws)}-${f2(SEASONS[y].final.ls)} in the title game.`:''}`)}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span><span class="bdet">${rec(t.w,t.l,t.t)}${SEASONS[y].po?` · ${t.seed} seed`:''}</span>${SEASONS[y].final?`<span class="bdet">beat ${esc(M[SEASONS[y].final.lose].short)} ${f1(SEASONS[y].final.ws)}–${f1(SEASONS[y].final.ls)}</span>`:''}</a>`;}).join('')}</div>`;
 }
 
 let STAND_MORE=false;
@@ -1163,6 +1189,69 @@ function rivalrySpotlight(){
     <div class="riv-wrap"><div class="riv-feat">${featHtml}</div><div class="riv-side">${gow}${others}</div></div></div>`;
 }
 
+// ----- League Wire & Milestone Watch (home) -----
+function leagueWire(){
+  const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS;
+  const reg=S.games.filter(g=>!g.po);
+  const wk=reg.length?Math.max(...reg.map(g=>g.wk)):0; if(!wk) return '';
+  const wg=S.games.filter(g=>g.wk===wk&&!g.multi);
+  const SG=GAMES.filter(g=>!g.multi);
+  const allSc=SG.flatMap(g=>[{m:g.h,s:g.hs,g},{m:g.a,s:g.as,g}]).sort((a,b)=>b.s-a.s);
+  const items=[];
+  const add=(tag,cls,html,w=1)=>items.push({tag,cls,html,w});
+  const nm=i=>`<a class="mgr" href="#franchise-${i}">${esc(M[i].short)}</a>`;
+  // top score of the week and its all-time rank
+  const wsc=wg.flatMap(g=>[{m:g.h,s:g.hs,g,t:g.ht},{m:g.a,s:g.as,g,t:g.at}]).sort((a,b)=>b.s-a.s);
+  if(wsc.length){const top=wsc[0], r=allSc.findIndex(x=>x.g===top.g&&x.m===top.m)+1;
+    add('High score','w-rec',`${nm(top.m)} led Week ${wk} with <b>${f2(top.s)}</b>${r<=50?`, the <b>${ord(r)}-best</b> score in league history`:''}.`,r<=25?3:2);
+    const low=wsc[wsc.length-1]; const lr=allSc.length-allSc.findIndex(x=>x.g===low.g&&x.m===low.m);
+    if(lr<=40) add('Low point','w-bad',`${nm(low.m)} managed just <b>${f2(low.s)}</b>, the ${ord(lr)}-lowest score ever.`,2);}
+  // blowout and nail-biter
+  const nt=wg.filter(g=>!g.tie);
+  const blow=nt.slice().sort((a,b)=>b.margin-a.margin)[0];
+  if(blow){const r=SG.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin).indexOf(blow)+1;
+    if(blow.margin>=40) add('Blowout','w-rec',`${nm(blow.win)} crushed ${nm(blow.lose)} by <b>${f1(blow.margin)}</b>${r<=30?`, the ${ord(r)}-biggest margin ever`:''}.`,r<=30?2:1);}
+  const close=nt.slice().sort((a,b)=>a.margin-b.margin)[0];
+  if(close&&close.margin<5) add('Nail-biter','w-neu',`${nm(close.win)} edged ${nm(close.lose)} by <b>${f2(close.margin)}</b>, ${f2(close.ws)}–${f2(close.ls)}.`,2);
+  // upset (records entering the week)
+  const ups=nt.filter(g=>g.hRec&&g.aRec).map(g=>{const wr=g.win===g.h?g.hRec:g.aRec, lr=g.win===g.h?g.aRec:g.hRec; return {g,wr,lr,d:(lr.w-lr.l)-(wr.w-wr.l)};}).filter(x=>x.d>=4).sort((a,b)=>b.d-a.d)[0];
+  if(ups) add('Upset','w-neu',`${rec(ups.wr.w,ups.wr.l)} ${nm(ups.g.win)} took down ${rec(ups.lr.w,ups.lr.l)} ${nm(ups.g.lose)}.`,2);
+  // head-to-head streaks extended this week
+  wg.forEach(g=>{ if(g.tie) return; const h=C[g.win].h2h[g.lose]; const L=h.list; let n=0; for(let k=L.length-1;k>=0&&L[k].r==='W';k--)n++;
+    if(n>=5) add('Rivalry','w-neu',`${nm(g.win)} has now beaten ${nm(g.lose)} <b>${n} straight</b> (${rec(h.w,h.l,h.t)} all-time).`,n>=10?3:2);
+    else if(h.n>=15&&Math.abs(h.w-h.l)<=1) add('Rivalry','w-neu',`${nm(g.win)} evened things up${h.w===h.l?'':' again'} with ${nm(g.lose)}: <b>${rec(h.w,h.l,h.t)}</b> after ${h.n} meetings.`,1); });
+  // active streaks
+  if(!curS.complete){
+    C.filter(c=>c.active&&c.curStreak).forEach(c=>{const n=parseInt(c.curStreak.slice(1)); if(n>=4) add('Streak',c.curStreak[0]==='W'?'w-good':'w-bad',`${nm(c.i)} has ${c.curStreak[0]==='W'?'won':'lost'} <b>${n} straight</b>.`,n>=6?2:1);});
+  }
+  // milestones crossed this week
+  const LV={wins:[50,100,150,200],pts:[10000,15000,20000,25000,30000]};
+  C.filter(c=>c.active).forEach(c=>{const thisWk=c.games.filter(x=>x.y===S.y&&x.wk===wk);
+    if(!thisWk.length) return; const wNow=c.w, wBefore=c.w-thisWk.filter(x=>x.r==='W'&&!x.po).length, pNow=c.pf, pBefore=c.pf-sum(thisWk.filter(x=>!x.po).map(x=>x.ms));
+    LV.wins.forEach(L=>{if(wBefore<L&&wNow>=L) add('Milestone','w-gold',`${nm(c.i)} reached <b>${L} career wins</b>.`,3);});
+    LV.pts.forEach(L=>{if(pBefore<L&&pNow>=L) add('Milestone','w-gold',`${nm(c.i)} passed <b>${f0(L)} career points</b>.`,3);});});
+  // playoff odds headline
+  if(!curS.complete&&curS.upcoming&&curS.upcoming.length){const NM=nowModel(); const fav=curS.list.slice().sort((a,b)=>NM.res[b.id].title-NM.res[a.id].title)[0];
+    const bubble=curS.list.filter(t=>{const p=NM.res[t.id].po/NM.N; return p>.3&&p<.7;}).sort((a,b)=>NM.res[b.id].po-NM.res[a.id].po);
+    add('Odds','w-neu',`${nm(fav.m)} is the title favorite at <b>${f0(NM.res[fav.id].title/NM.N*100)}%</b>.${bubble.length?` On the bubble: ${bubble.map(t=>`${nm(t.m)} (${f0(NM.res[t.id].po/NM.N*100)}%)`).join(', ')}.`:''}`,2);}
+  const top=items.sort((a,b)=>b.w-a.w).slice(0,8);
+  return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>League Wire</h3><a class="chip" href="#now">${S.y} Week ${wk}</a></div><div class="wire">${top.map(x=>`<div class="wire-item"><span class="wtag ${x.cls}">${x.tag}</span><span>${x.html}</span></div>`).join('')}</div></div>`;
+}
+function milestoneWatch(){
+  const stats=[
+    ['career wins',c=>c.w,[50,100,150,200],v=>v],
+    ['career points',c=>c.pf,[10000,15000,20000,25000,30000],f0],
+    ['playoff trips',c=>c.poApps.length,[5,10,15],v=>v],
+    ['weekly high scores',c=>c.hiWeeks,[10,25,50],v=>v],
+    ['150-point games',c=>c.g150,[10,20,30],v=>v],
+    ['career playoff wins',c=>c.pow,[5,10,15],v=>v]];
+  const rows=[];
+  C.filter(c=>c.active).forEach(c=>stats.forEach(([label,fn,levels,fm])=>{const v=fn(c), L=levels.find(x=>x>v); if(!L) return; const prev=[0,...levels].filter(x=>x<=v).pop(); const need=L-v;
+    rows.push({c,label,v,L,need,fm,pct:(v-prev)/(L-prev),close:need/L});}));
+  const top=rows.sort((a,b)=>a.close-b.close).slice(0,6);
+  return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>Milestone Watch</h3><a class="chip" href="#records-career">All milestones</a></div><div class="rec-list">${top.map(r=>`<div class="ms-row"><div class="head" style="align-items:baseline"><span>${mlink(r.c.i)} <span class="sub">needs ${r.fm(r.need)} for ${r.fm(r.L)} ${r.label}</span></span><span class="sub num">${r.fm(r.v)}</span></div><div class="bar"><i style="width:${Math.max(4,Math.min(100,r.pct*100))}%"></i></div></div>`).join('')}</div></div>`;
+}
+
 // ----- Home (history front page) -----
 function vHome(){
   const totPts=sum(GAMES.flatMap(g=>[g.hs,g.as]));
@@ -1195,6 +1284,7 @@ function vHome(){
   const explore=[['#standings','All-Time Standings','Every manager since 2011'],['#records','Record Book','Highs, lows, streaks and droughts'],['#franchise','Franchises','Career pages for every manager'],['#h2h','Head-to-Head','Who owns who'],['#achievements','Achievements','Trophies and follies'],['#now',`${CUR} Season`,'Live standings and results']];
   return `
   <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Rafters</h3><a class="chip" href="#champions">All champions</a></div>${rafters(true)}</div>
+  <div class="grid2" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">${leagueWire()}${milestoneWatch()}</div>
   <div class="grid2">
     <div class="card"><div class="head" style="margin-bottom:6px"><h3>Dynasty Leaderboard</h3><a class="chip" href="#ratings">League Ratings</a></div>
       <div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Manager</th><th class="r">Titles</th><th class="r">Finals</th><th class="r">Playoffs</th><th class="r">Win %</th></tr></thead><tbody>${dyn.map(c=>`<tr><td class="r num">${c.rank}</td><td class="pin">${mlink(c.i)}<div class="sub">${c.titles.length?c.titles.join(', '):'no titles yet'}</div></td><td class="r num"><b>${c.titles.length}</b></td><td class="r num">${c.finals.length}</td><td class="r num">${c.poApps.length}</td><td class="r num">${pct(c.wp)}</td></tr>`).join('')}</tbody></table></div></div>
