@@ -164,6 +164,14 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:6px;backgroun
 .explore a span{font-size:13px;color:#b8c0d4}
 .explore a:hover{border-left-color:var(--gold)}
 @media (max-width:700px){.hero{grid-template-columns:1fr;justify-items:center}.hero-copy h2{font-size:28px}}
+.mu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:12px}
+.mu-side{display:flex;flex-direction:column;gap:4px}
+.mu-side:last-of-type{text-align:right}
+.mu-vs{font-family:var(--display);color:var(--muted);font-weight:700;padding-top:4px}
+.mu-p{font-family:var(--display);font-size:26px;font-weight:700;color:var(--muted)}
+.mu-p.fav{color:var(--accent)}
+.mu-foot{grid-column:1/-1;border-top:1px solid var(--line);padding-top:8px;font-size:13px}
 .heat{font-size:12px}
 .heat th,.heat td{padding:4px 3px;text-align:center;min-width:30px}
 .heat th a{text-decoration:none;color:inherit}
@@ -1125,41 +1133,174 @@ function vHome(){
 }
 
 // ----- This season -----
+let NOWM=null;
+function erfc_(x){const z=Math.abs(x),t=1/(1+.5*z);const r=t*Math.exp(-z*z-1.26551223+t*(1.00002368+t*(.37409196+t*(.09678418+t*(-.18628806+t*(.27886807+t*(-1.13520398+t*(1.48851587+t*(-.82215223+t*.17087277)))))))));return x>=0?r:2-r;}
+const Phi=x=>.5*erfc_(-x/Math.SQRT2);
+function nowModel(){
+  if(NOWM) return NOWM;
+  const S=curS, list=S.list, reg=S.games.filter(g=>!g.po), po=S.po||6, G=S.reg;
+  const lastWk=reg.length?Math.max(...reg.map(g=>g.wk)):0;
+  const sc={}; list.forEach(t=>sc[t.id]=[]);
+  reg.forEach(g=>{sc[g.ht.id].push({wk:g.wk,s:g.hs,o:g.as,op:g.at,g}); sc[g.at.id].push({wk:g.wk,s:g.as,o:g.hs,op:g.ht,g});});
+  list.forEach(t=>sc[t.id].sort((a,b)=>a.wk-b.wk));
+  const allS=reg.flatMap(g=>[g.hs,g.as]), lgM=avg(allS), lgSd=sd(allS);
+  const model={}; list.forEach(t=>{const a=sc[t.id].map(x=>x.s), n=a.length, m=n?avg(a):lgM, s=n>1?sd(a):lgSd;
+    model[t.id]={mu:(n*m+3*lgM)/(n+3), sig:Math.sqrt((n*s*s+4*lgSd*lgSd)/(n+4))};});
+  const up=S.upcoming.filter(g=>g.wk<=G).sort((a,b)=>a.wk-b.wk);
+  const remaining={}; list.forEach(t=>remaining[t.id]=up.filter(g=>g.ht===t||g.at===t).map(g=>g.ht===t?g.at:g.ht));
+  const winP=(a,b)=>Phi((model[a.id].mu-model[b.id].mu)/Math.sqrt(model[a.id].sig**2+model[b.id].sig**2));
+  // simulation
+  let seed=20261111; const rnd=()=>{seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296;};
+  const norm=()=>{let u=0,v=0; while(!u)u=rnd(); while(!v)v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  const draw=id=>model[id].mu+model[id].sig*norm();
+  const N=10000, res={}; list.forEach(t=>res[t.id]={po:0,bye:0,title:0,final:0,w:0,pf:0,seed:0});
+  for(let k=0;k<N;k++){
+    const W={},PF={}; list.forEach(t=>{W[t.id]=t.w+t.t/2; PF[t.id]=t.pf;});
+    up.forEach(g=>{const a=draw(g.ht.id),b=draw(g.at.id); PF[g.ht.id]+=a; PF[g.at.id]+=b; if(a>b)W[g.ht.id]++; else W[g.at.id]++;});
+    const order=list.map(t=>t.id).sort((x,y)=>W[y]-W[x]||PF[y]-PF[x]);
+    order.forEach((id,i)=>{const r=res[id]; r.w+=W[id]; r.pf+=PF[id]; r.seed+=i+1; if(i<po)r.po++; if(i<2)r.bye++;});
+    if(po===6){const o=order, g=(a,b)=>draw(a)>draw(b)?a:b; const w45=g(o[3],o[4]), w36=g(o[2],o[5]); const f1=g(o[0],w45), f2=g(o[1],w36); res[f1].final++; res[f2].final++; res[g(f1,f2)].title++;}
+  }
+  // clinch / elimination (ties broken by points, so ties count as not yet decided)
+  const cur=list.slice().sort((a,b)=>(b.w-a.w)||(b.pf-a.pf));
+  const maxW=t=>t.w+t.t/2+remaining[t.id].length;
+  const status={};
+  list.forEach(t=>{const others=list.filter(o=>o!==t), w=t.w+t.t/2;
+    const canPass=others.filter(o=>maxW(o)>=w).length, surelyAhead=others.filter(o=>o.w+o.t/2>maxW(t)).length;
+    const st={clinched:canPass<=po-1, bye:canPass<=1, elim:surelyAhead>=po};
+    const out=cur[po], inLast=cur[po-1];
+    if(!st.clinched&&!st.elim){
+      const idx=cur.indexOf(t);
+      if(idx<po&&out){ st.magic=Math.max(1, G+1-w-(out.l+out.t/2)); }
+      else if(inLast){ st.gb=((inLast.w-t.w)+(t.l-inLast.l))/2; }
+    }
+    status[t.id]=st;});
+  const sos={}; list.forEach(t=>{const r=remaining[t.id]; sos[t.id]=r.length?avg(r.map(o=>model[o.id].mu)):NaN;});
+  // power rankings at a given week
+  const powerAt=wk=>{const rows=list.map(t=>{const gs=sc[t.id].filter(x=>x.wk<=wk); if(!gs.length) return {t,score:0};
+      const w=gs.filter(x=>x.s>x.o).length+gs.filter(x=>x.s===x.o).length/2, wp=w/gs.length;
+      let apw=0,apn=0; gs.forEach(x=>{const k=S.y+'-'+x.wk; (weekly[k]||[]).forEach(o=>{if(o.t!==t){apn++; if(x.s>o.s)apw++; else if(x.s===o.s)apw+=.5;}});});
+      const ap=apn?apw/apn:.5; const l3=gs.slice(-3), lgW=avg(reg.filter(g=>g.wk<=wk&&g.wk>wk-3).flatMap(g=>[g.hs,g.as]));
+      const form=avg(l3.map(x=>x.s))/lgW;
+      return {t,wp,ap,form,score:.35*wp+.35*ap+.3*(.5+(form-1)*2)};});
+    rows.sort((a,b)=>b.score-a.score); rows.forEach((r,i)=>r.rank=i+1); return rows;};
+  const pNow=powerAt(lastWk), pPrev=lastWk>1?powerAt(lastWk-1):pNow;
+  pNow.forEach(r=>{const p=pPrev.find(x=>x.t===r.t); r.move=p?p.rank-r.rank:0;});
+  // rank by week
+  const rankByWeek=[]; for(let w=1;w<=lastWk;w++){ const W={},PF={}; list.forEach(t=>{W[t.id]=0;PF[t.id]=0;});
+    reg.filter(g=>g.wk<=w).forEach(g=>{PF[g.ht.id]+=g.hs; PF[g.at.id]+=g.as; if(g.hs>g.as)W[g.ht.id]++; else if(g.as>g.hs)W[g.at.id]++; else {W[g.ht.id]+=.5;W[g.at.id]+=.5;}});
+    const o=list.map(t=>t.id).sort((x,y)=>W[y]-W[x]||PF[y]-PF[x]); rankByWeek.push(Object.fromEntries(o.map((id,i)=>[id,i+1])));}
+  NOWM={S,list,reg,po,G,lastWk,sc,model,up,remaining,winP,res,N,status,sos,pNow,rankByWeek,lgM};
+  return NOWM;
+}
 function vNow(){
   const S=curS, live=!S.complete;
-  const lw=Math.max(...S.games.map(g=>g.wk));
-  const stand=S.list.slice().sort((a,b)=>live?(a.seed-b.seed):(a.f-b.f));
-  const streakOf=t=>C[t.m].curStreak||'';
-  const standRows=stand.map((t,k)=>`<tr><td class="r num">${live?t.seed:t.f}</td><td class="pin"><b>${esc(t.n)}</b><div class="sub">${mlink(t.m)}</div></td><td class="r num">${rec(t.w,t.l,t.t)}</td><td class="r num">${f2(t.pf)}</td><td class="r num">${f2(t.pa)}</td><td class="r num">${f0(t.ap.w)}-${f0(t.ap.l)}</td><td class="r num"><span class="${streakOf(t)[0]==='W'?'pos':'neg'}">${streakOf(t)}</span></td></tr>${live&&k===S.po-1?`<tr><td colspan="7" style="padding:0;border-bottom:2px dashed var(--accent)"></td></tr>`:''}`).join('');
-  const wg=S.games.filter(g=>g.wk===lw);
+  if(!live) return `<div class="head"><div><h2>${CUR} Season</h2><p class="lede">Final. ${esc(M[S.champ.m].short)} won the title.</p></div><a class="chip" href="#season-${CUR}">Full season</a></div>`;
+  const NM=nowModel(), {list,reg,po,G,lastWk,sc,model,up,remaining,winP,res,N,status,sos,pNow,rankByWeek}=NM;
+  const tm=t=>`<b>${esc(t.n)}</b><div class="sub">${mlink(t.m)}</div>`;
+  const form=t=>sc[t.id].slice(-3).map(x=>x.s>x.o?'W':x.s<x.o?'L':'T').join('');
+  const stand=list.slice().sort((a,b)=>a.seed-b.seed);
+  const pc=x=>{const p=x/N*100; return p>=99.95?'>99.9%':p<=0.05&&x>0?'<0.1%':p===0?'–':f1(p)+'%';};
+  // ---- this week's matchups
+  const nextWk=up.length?up[0].wk:null, nextGames=up.filter(g=>g.wk===nextWk);
+  const muCard=g=>{const a=g.ht,b=g.at, pa=winP(a,b), h=C[a.m].h2h[b.m]; const fav=pa>=.5?a:b, fp=Math.max(pa,1-pa);
+    let hist='First meeting'; if(h&&h.n){const lead=h.w>h.l?`${M[a.m].short} leads ${h.w}-${h.l}${h.t?'-'+h.t:''}`:h.l>h.w?`${M[b.m].short} leads ${h.l}-${h.w}${h.t?'-'+h.t:''}`:`Tied ${h.w}-${h.l}`; const L=h.list[h.list.length-1]; const lw=L.r==='W'?a.m:b.m;
+      hist=`${lead} all-time · last met ${L.y} Wk ${L.wk}, ${esc(M[lw].short)} won ${f2(Math.max(L.ms,L.os))}-${f2(Math.min(L.ms,L.os))}`;}
+    const side=(t,p)=>`<div class="mu-side"><div>${tm(t)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG · form ${form(t)||'–'}</div><div class="mu-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div></div>`;
+    return `<div class="mu">${side(a,pa)}<div class="mu-vs">vs</div>${side(b,1-pa)}<div class="mu-foot">${hist}<br><span class="sub">Favorite: ${esc(M[fav.m].short)} (${f0(fp*100)}%)</span></div></div>`;};
+  // ---- playoff odds table
+  const odds=list.map(t=>{const r=res[t.id], st=status[t.id]; const ew=r.w/N; return {t,po:r.po,bye:r.bye,title:r.title,final:r.final,ew,el:G-ew,seedAvg:r.seed/N,st,sos:sos[t.id],rem:remaining[t.id]};});
+  const sosRank=odds.filter(o=>!isNaN(o.sos)).slice().sort((a,b)=>b.sos-a.sos);
+  const stPill=o=>o.st.elim?'<span class="pill p-last">Eliminated</span>':o.st.bye?'<span class="pill p-champ">Clinched bye</span>':o.st.clinched?'<span class="pill p-po">Clinched</span>':o.st.magic!=null?`<span class="pill p-miss">Magic # ${o.st.magic}</span>`:o.st.gb!=null?`<span class="pill p-miss">${o.st.gb>0?o.st.gb+' GB':'On the bubble'}</span>`:'';
+  const oddsCols=[
+    {k:'seed',label:'#',r:1,asc:1,f:r=>r.t.seed,sv:r=>r.t.seed},
+    {k:'team',label:'Team',pin:1,f:r=>tm(r.t),sv:r=>r.t.n,asc:1},
+    {k:'rec',label:'Now',r:1,f:r=>rec(r.t.w,r.t.l,r.t.t),sv:r=>r.t.w},
+    {k:'ew',label:'Proj.',r:1,f:r=>`${f1(r.ew)}-${f1(r.el)}`},
+    {k:'po',label:'Playoffs',r:1,f:r=>`<b>${pc(r.po)}</b>`},
+    {k:'bye',label:'Bye',r:1,f:r=>pc(r.bye)},
+    {k:'final',label:'Final',r:1,f:r=>pc(r.final)},
+    {k:'title',label:'Title',r:1,f:r=>`<b>${pc(r.title)}</b>`},
+    {k:'st',label:'Status',nosort:1,f:r=>stPill(r)},
+    {k:'sos',label:'Remaining',f:r=>`<span class="sub">${r.rem.map(o=>esc(M[o.m].short)).join(', ')||'–'}</span><div class="sub">SOS #${sosRank.indexOf(r)+1} of ${sosRank.length}</div>`,sv:r=>r.sos},
+  ];
+  // ---- power rankings
+  const prRows=pNow.map(r=>`<tr><td class="r num"><b>${r.rank}</b></td><td class="r num">${r.move>0?`<span class="pos">▲${r.move}</span>`:r.move<0?`<span class="neg">▼${-r.move}</span>`:'<span class="sub">–</span>'}</td><td class="pin">${tm(r.t)}</td><td class="r num">${rec(r.t.w,r.t.l,r.t.t)}</td><td class="r num">${pct(r.ap)}</td><td class="r num">${form(r.t)}</td></tr>`).join('');
+  // ---- standings by week chart
+  const PAL=['#c8102e','#16213e','#b8860b','#1f8a4c','#7b3fa0','#e07b00','#2a7fbf','#9aa3b8','#d6457a','#5a8f00','#00a3a3','#8a5a2b'];
+  const ordered=stand;
+  const bump=lineChart({xs:Array.from({length:lastWk},(_,k)=>k+1),series:ordered.map((t,i)=>({name:`${M[t.m].short}`,color:PAL[i%PAL.length],w:2,pts:rankByWeek.map((r,k)=>[k+1,r[t.id],t.n])})),yMin:1,yMax:list.length,invert:1,yTicks:[1,3,6,9,12].filter(v=>v<=list.length),yFmt:v=>ord(Math.round(v)),h:300});
+  // ---- latest week results with rivalry notes
+  const wg=reg.filter(g=>g.wk===lastWk);
   const wkHi=wg.flatMap(g=>[[g.ht,g.hs],[g.at,g.as]]).sort((a,b)=>b[1]-a[1])[0];
-  const wkHtml=wg.map(g=>`<div class="gm"><span class="w">${esc(g.wt.n)}</span><span class="num w">${f2(g.ws)}</span><span class="l">${esc(g.lt.n)}</span><span class="num l">${f2(g.ls)}</span></div>`).join('');
+  const wkHtml=wg.map(g=>{const h=C[g.win].h2h[g.lose]; return `<div class="gm"><span class="w">${esc(g.wt.n)}</span><span class="num w">${f2(g.ws)}</span><span class="l">${esc(g.lt.n)}</span><span class="num l">${f2(g.ls)}</span><span class="sub" style="grid-column:1/-1">${esc(M[g.win].short)} is now ${rec(h.w,h.l,h.t)} all-time vs ${esc(M[g.lose].short)}</span></div>`;}).join('');
+  // ---- weekly awards
+  const awards=[]; for(let w=lastWk;w>=1;w--){const gs=reg.filter(g=>g.wk===w); if(!gs.length)continue; const sc2=gs.flatMap(g=>[[g.ht,g.hs],[g.at,g.as]]).sort((a,b)=>b[1]-a[1]); const nt=gs.filter(g=>!g.tie);
+    const bl=nt.slice().sort((a,b)=>b.margin-a.margin)[0], cl=nt.slice().sort((a,b)=>a.margin-b.margin)[0];
+    awards.push(`<tr><td class="num"><b>${w}</b></td><td>${esc(M[sc2[0][0].m].short)} <span class="sub num">${f2(sc2[0][1])}</span></td><td>${esc(M[sc2[sc2.length-1][0].m].short)} <span class="sub num">${f2(sc2[sc2.length-1][1])}</span></td><td>${bl?`${esc(M[bl.win].short)} <span class="sub">over ${esc(M[bl.lose].short)} by ${f1(bl.margin)}</span>`:'–'}</td><td>${cl?`${esc(M[cl.win].short)} <span class="sub">over ${esc(M[cl.lose].short)} by ${f2(cl.margin)}</span>`:'–'}</td></tr>`);}
+  // ---- highs and lows
+  const SG=GAMES.filter(g=>!g.multi), allScores=SG.flatMap(g=>[{m:g.h,s:g.hs,g},{m:g.a,s:g.as,g}]).sort((a,b)=>b.s-a.s);
+  const curSc=allScores.filter(x=>x.g.y===CUR);
+  const blow=reg.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin)[0], close=reg.filter(g=>!g.tie).sort((a,b)=>a.margin-b.margin)[0];
+  const tiles=[
+    ['Best score',f2(curSc[0].s),`${M[curSc[0].m].short} · Wk ${curSc[0].g.wk} · #${allScores.indexOf(curSc[0])+1} all-time`],
+    ['Worst score',f2(curSc[curSc.length-1].s),`${M[curSc[curSc.length-1].m].short} · Wk ${curSc[curSc.length-1].g.wk}`],
+    ['Biggest blowout',f2(blow.margin),`${M[blow.win].short} over ${M[blow.lose].short} · Wk ${blow.wk}`],
+    ['Closest game',f2(close.margin),`${M[close.win].short} over ${M[close.lose].short} · Wk ${close.wk}`]];
+  // ---- pace watch
+  const TS=DONE.flatMap(y=>SEASONS[y].list);
+  const rankIn=(v,arr,desc=true)=>1+arr.filter(x=>desc?x>v:x<v).length;
+  const ppgAll=TS.map(t=>t.ppg), wpAll=TS.map(t=>t.wp);
+  const hiP=list.slice().sort((a,b)=>b.ppg-a.ppg)[0], loP=list.slice().sort((a,b)=>a.ppg-b.ppg)[0], bestR=list.slice().sort((a,b)=>b.wp-a.wp||b.pf-a.pf)[0], worstR=list.slice().sort((a,b)=>a.wp-b.wp||a.pf-b.pf)[0];
+  const lgSeason=DONE.map(y=>SEASONS[y].lgPpg);
+  const pace=[
+    ['Hottest offense',f1(hiP.ppg)+' PPG',`${M[hiP.m].short} · would rank #${rankIn(hiP.ppg,ppgAll)} of ${TS.length+1} seasons`],
+    ['Coldest offense',f1(loP.ppg)+' PPG',`${M[loP.m].short} · #${rankIn(loP.ppg,ppgAll,false)} lowest of ${TS.length+1}`],
+    ['Best record pace',`${f1(bestR.wp*G)}-${f1((1-bestR.wp)*G)}`,`${M[bestR.m].short} · win % #${rankIn(bestR.wp,wpAll)} all-time`],
+    ['Worst record pace',`${f1(worstR.wp*G)}-${f1((1-worstR.wp)*G)}`,`${M[worstR.m].short} · win % #${rankIn(worstR.wp,wpAll,false)} lowest`],
+    ['League scoring',f1(NM.lgM)+' PPG',`#${rankIn(NM.lgM,lgSeason)} of ${lgSeason.length+1} seasons`]];
+  // ---- points standings and schedule so far
+  const apRank=list.slice().sort((a,b)=>b.apPct-a.apPct), pfRank=list.slice().sort((a,b)=>b.pf-a.pf);
+  const ptsCols=[
+    {k:'ap',label:'All-Play #',r:1,asc:1,f:r=>apRank.indexOf(r)+1,sv:r=>apRank.indexOf(r)},
+    {k:'n',label:'Team',pin:1,f:r=>tm(r),sv:r=>r.n,asc:1},
+    {k:'apr',label:'All-Play',r:1,f:r=>`${f0(r.ap.w)}-${f0(r.ap.l)}`,sv:r=>r.apPct},
+    {k:'pf',label:'PF #',r:1,asc:1,f:r=>pfRank.indexOf(r)+1,sv:r=>pfRank.indexOf(r)},
+    {k:'seed',label:'Actual #',r:1,asc:1},
+    {k:'d',label:'By All-Play they\'d be',r:1,f:r=>{const d=r.seed-(apRank.indexOf(r)+1); return d>0?`<span class="neg">${d} spot${d>1?'s':''} higher</span>`:d<0?`<span class="pos">${-d} spot${d<-1?'s':''} lower</span>`:'<span class="sub">same spot</span>';},sv:r=>r.seed-(apRank.indexOf(r)+1)}];
+  const oppWp=t=>avg(sc[t.id].map(x=>x.op.wp));
+  const schCols=[
+    {k:'n',label:'Team',pin:1,f:r=>tm(r),sv:r=>r.n,asc:1},
+    {k:'papg',label:'Opp. PPG faced',r:1,f:r=>f1(r.papg)},
+    {k:'owp',label:'Opp. win %',r:1,f:r=>pct(oppWp(r)),sv:r=>oppWp(r)},
+    {k:'luck',label:'Luck',r:1,f:r=>`<span class="${r.luck>=0?'pos':'neg'}">${sgn(r.luck)}</span>`}];
+  // ---- streaks and luck
   const act=C.filter(c=>c.active&&c.curStreak);
   const hot=act.filter(c=>c.curStreak[0]==='W').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).slice(0,3);
   const cold=act.filter(c=>c.curStreak[0]==='L').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).slice(0,3);
   const sRow=(c,cls)=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(c.i)}<div class="sub">${esc(c.curTeam)}</div></span><span class="val ${cls}">${c.curStreak}</span></div>`;
-  const SG=GAMES.filter(g=>!g.multi);
-  const allScores=SG.flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,g},{m:g.a,t:g.at,s:g.as,g}]).sort((a,b)=>b.s-a.s);
-  const cur=allScores.filter(x=>x.g.y===CUR);
-  const reg=S.games.filter(g=>!g.po);
-  const blow=reg.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin)[0], close=reg.filter(g=>!g.tie).sort((a,b)=>a.margin-b.margin)[0];
-  const tiles=[
-    ['Best score',f2(cur[0].s),`${M[cur[0].m].short} · Wk ${cur[0].g.wk} · #${allScores.indexOf(cur[0])+1} all-time`],
-    ['Worst score',f2(cur[cur.length-1].s),`${M[cur[cur.length-1].m].short} · Wk ${cur[cur.length-1].g.wk}`],
-    ['Biggest blowout',f2(blow.margin),`${M[blow.win].short} over ${M[blow.lose].short} · Wk ${blow.wk}`],
-    ['Closest game',f2(close.margin),`${M[close.win].short} over ${M[close.lose].short} · Wk ${close.wk}`],
-  ];
-  const luck=S.list.slice().sort((a,b)=>b.luck-a.luck);
+  const luck=list.slice().sort((a,b)=>b.luck-a.luck);
   const lk=t=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(t.m)}<div class="sub">${rec(t.w,t.l,t.t)} · all-play ${f0(t.ap.w)}-${f0(t.ap.l)}</div></span><span class="val ${t.luck>=0?'pos':'neg'}">${sgn(t.luck)}</span></div>`;
+  const standRows=stand.map((t,k)=>`<tr><td class="r num">${t.seed}</td><td class="pin">${tm(t)}</td><td class="r num">${rec(t.w,t.l,t.t)}</td><td class="r num">${f2(t.pf)}</td><td class="r num">${f2(t.pa)}</td><td class="r num"><span class="${(C[t.m].curStreak||'')[0]==='W'?'pos':'neg'}">${C[t.m].curStreak||''}</span></td></tr>${k===po-1?`<tr><td colspan="6" style="padding:0;border-bottom:2px dashed var(--accent)"></td></tr>`:''}`).join('');
   return `
-  <div class="head"><div><h2>${CUR} Season</h2><p class="lede">${live?`Through Week ${lw} of ${S.reg}. ${esc(M[stand[0].m].short)} leads at ${rec(stand[0].w,stand[0].l,stand[0].t)}. ${S.reg-lw>0?`${S.reg-lw} week${S.reg-lw>1?'s':''} left in the regular season.`:'Regular season is done.'}`:`Final. ${esc(M[S.champ.m].short)} won the title.`}</p></div><a class="chip" href="#season-${CUR}">Every week's results</a></div>
+  <div class="head"><div><h2>${CUR} Season</h2><p class="lede">Through Week ${lastWk} of ${G}. ${esc(M[stand[0].m].short)} leads at ${rec(stand[0].w,stand[0].l,stand[0].t)}. ${G-lastWk>0?`${G-lastWk} week${G-lastWk>1?'s':''} left before the ${po}-team playoff.`:'Regular season is done.'}</p></div><a class="chip" href="#season-${CUR}">Every week's results</a></div>
+  ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} Matchups</h3><span class="sub">Win chances from each team's ${CUR} scoring</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
+  <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule, using each team's scoring this season. Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
   <div class="grid2">
-    <div class="card"><h3>Standings</h3>
-      <div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">PF</th><th class="r">PA</th><th class="r">All-Play</th><th class="r">Strk</th></tr></thead><tbody>${standRows}</tbody></table></div>
-      ${live?`<p class="note">Dashed line marks the playoff cut (top ${S.po}).</p>`:''}</div>
-    <div class="card"><div class="head" style="margin-bottom:6px"><h3>Week ${lw} Results</h3><span class="sub">High score: ${esc(wkHi[0].n)} ${f2(wkHi[1])}</span></div>${wkHtml}</div>
+    <div class="card"><h3>Standings</h3><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">PF</th><th class="r">PA</th><th class="r">Strk</th></tr></thead><tbody>${standRows}</tbody></table></div><p class="note">Dashed line marks the playoff cut (top ${po}).</p></div>
+    <div class="card"><h3>Power Rankings</h3><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="r">Move</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">All-Play</th><th class="r">Last 3</th></tr></thead><tbody>${prRows}</tbody></table></div><p class="note">Blends record, All-Play and the last three weeks of scoring. Movement is since Week ${Math.max(1,lastWk-1)}.</p></div>
+  </div>
+  <div class="card"><h3>Standings by Week</h3><div class="legend">${ordered.map((t,i)=>`<span style="--c:${PAL[i%PAL.length]}">${esc(M[t.m].short)}</span>`).join('')}</div>${bump}</div>
+  <div class="grid2">
+    <div class="card"><div class="head" style="margin-bottom:6px"><h3>Week ${lastWk} Results</h3><span class="sub">High score: ${esc(wkHi[0].n)} ${f2(wkHi[1])}</span></div>${wkHtml}</div>
+    <div class="card"><h3>Weekly Awards</h3><div class="tblwrap"><table><thead><tr><th>Wk</th><th>Top score</th><th>Low score</th><th>Blowout</th><th>Nail-biter</th></tr></thead><tbody>${awards.join('')}</tbody></table></div></div>
   </div>
   <div class="card"><h3>Season Highs and Lows</h3><div class="tiles">${tiles.map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v num">${t[1]}</div><div class="sub">${esc(String(t[2]))}</div></div>`).join('')}</div></div>
+  <div class="card"><h3>Pace Watch</h3><div class="tiles">${pace.map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v num">${t[1]}</div><div class="sub">${esc(String(t[2]))}</div></div>`).join('')}</div><p class="note">Where this season's paces would land among all ${TS.length} completed team seasons.</p></div>
+  <div class="grid2">
+    <div class="card"><h3>Standings by Points</h3>${table('t-pts',ptsCols,list,'ap','asc')}<p class="note">All-Play ranks teams as if everyone played everyone every week. Red means the schedule has cost a team spots; green means it has helped.</p></div>
+    <div class="card"><h3>Schedule So Far</h3>${table('t-sch',schCols,list,'papg','desc')}<p class="note">How tough each team's opponents have been: points per game allowed and those opponents' current win %.</p></div>
+  </div>
   <div class="grid3">
     <div class="card"><h3>Heating Up</h3><div class="rec-list">${hot.map(c=>sRow(c,'pos')).join('')||'<p class="note">Nobody on a win streak.</p>'}</div></div>
     <div class="card"><h3>Ice Cold</h3><div class="rec-list">${cold.map(c=>sRow(c,'neg')).join('')||'<p class="note">Nobody on a skid.</p>'}</div></div>
