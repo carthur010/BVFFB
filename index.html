@@ -507,12 +507,13 @@ function lineChart({series, xs, yMin, yMax, invert, yFmt, h=260, yTicks, marks})
   if(yMin==null){const pad=(hi-lo)*.1||1; lo-=pad; hi+=pad;}
   const xi=x=>L+(xs.length===1?iw/2:xs.indexOf(x)*iw/(xs.length-1));
   const yv=v=>invert? T+(v-lo)/(hi-lo)*ih : T+ih-(v-lo)/(hi-lo)*ih;
-  const ticks = yTicks || Array.from({length:5},(_,k)=>lo+(hi-lo)*k/4);
+  if(!yTicks&&yMin==null){const st=(hi-lo)/4>8?10:5; lo=Math.floor(lo/st)*st; hi=Math.ceil(hi/st)*st;}
+  const ticks = yTicks || (()=>{const st=(hi-lo)/4>8?10:((hi-lo)/4>3?5:(hi-lo)/4); const out=[]; for(let v=lo; v<=hi+1e-9; v+=st) out.push(v); return out.length>7?out.filter((_,k)=>k%2===0):out;})();
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img">`;
   ticks.forEach(t=>{s+=`<line x1="${L}" x2="${W-R}" y1="${yv(t)}" y2="${yv(t)}" stroke="var(--line)"/><text x="${L-6}" y="${yv(t)+4}" font-size="11" text-anchor="end" fill="var(--muted)">${yFmt?yFmt(t):Math.round(t)}</text>`;});
   (marks||[]).forEach((m,mi)=>{ if(xs.indexOf(m.x)<0) return; const x=xi(m.x); s+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${T+ih}" stroke="var(--muted)" stroke-dasharray="2 3"/><text x="${x+4}" y="${T+10+mi*13}" font-size="10" fill="var(--muted)">${esc(m.label)}</text>`; });
   const step=Math.ceil(xs.length/12);
-  xs.forEach((x,k)=>{ if(k%step===0||k===xs.length-1) s+=`<text x="${xi(x)}" y="${H-8}" font-size="11" text-anchor="middle" fill="var(--muted)">${String(x).length===4?"'"+String(x).slice(2):x}</text>`; });
+  xs.forEach((x,k)=>{ if(k%step===0||k===xs.length-1) s+=`<text x="${xi(x)}" y="${H-8}" font-size="11" text-anchor="middle" fill="var(--muted)">${/^\d{4}$/.test(String(x))?"'"+String(x).slice(2):x}</text>`; });
   series.forEach(se=>{
     const pts=se.pts.filter(p=>p[1]!=null);
     if(se.area&&pts.length>1){ s+=`<path d="M${xi(pts[0][0])},${T+ih} ${pts.map(p=>`L${xi(p[0])},${yv(p[1])}`).join(' ')} L${xi(pts[pts.length-1][0])},${T+ih} Z" fill="${se.color}" opacity=".12"/>`; }
