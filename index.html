@@ -944,7 +944,7 @@ function vRecords(sec){
     </div>
     <div class="card"><h3>Milestones</h3><p class="note" style="margin:-6px 0 8px">Every club, who's in it, and which active managers are closest to joining.</p><div class="rec-list" style="columns:2 360px;column-gap:28px;display:block">${msHtml}</div></div>`;
   }
-  return `<div class="head"><div><h2>Record Book</h2><p class="lede">The marks everyone is chasing, and a few nobody wants. Two-week playoff totals from 2011, 2013 and 2014 are left out of single-game records so they don't bury everything else.</p></div></div>${nav}${filters}${body}`;
+  return `<div class="head"><div><h2>Record Book</h2><p class="lede">Two-week playoff totals from 2011, 2013 and 2014 are left out of single-game records so they don't bury everything else.</p></div></div>${nav}${filters}${body}`;
 }
 
 // ----- Franchise -----
@@ -1025,7 +1025,7 @@ function vH2H(){
   const cell=(a,b)=>{ if(a===b) return `<td style="background:var(--soft)"></td>`; const h=rec2(a,b.i,H2H_OPTS.po); if(!h||!h.n) return `<td class="sub">–</td>`;
     const p=(h.w+h.t/2)/h.n; const bg=p>.5?`color-mix(in srgb, var(--good) ${Math.round((p-.5)*120+10)}%, var(--surface))`:p<.5?`color-mix(in srgb, var(--bad) ${Math.round((.5-p)*120+10)}%, var(--surface))`:'var(--soft)';
     return `<td class="cell num" style="background:${bg}" data-vs="${a.i}-${b.i}" title="${esc(a.name)} vs ${esc(b.name)}: ${rec(h.w,h.l,h.t)}">${rec(h.w,h.l,h.t)}</td>`;};
-  return `<div class="head"><div><h2>Head-to-Head</h2><p class="lede">Pick any two managers to see who has beaten who, who scores more and who has gotten luckier. The full rivalry grid is below.</p></div></div>
+  return `<div class="head"><div><h2>Head-to-Head</h2></div></div>
   ${vVersusBody(...defaultPair(),true)}
   <div class="card"><div class="head" style="margin-bottom:12px"><div><h3>Head-to-Head Grid</h3><p class="note" style="margin:4px 0 0">Read across: each row is that manager's record against the column. Green means they own the matchup. Click any cell to load it into Versus above.</p></div><div class="ctrl"><label class="toggle"><input type="checkbox" id="h-act" ${H2H_OPTS.active?'checked':''}> Active managers only</label><label class="toggle"><input type="checkbox" id="h-po" ${H2H_OPTS.po?'checked':''}> Include playoffs</label></div></div><div class="tblwrap"><table class="h2h"><thead><tr><th class="rowh"></th>${list.map(b=>`<th class="colh">${esc(b.m.short)}</th>`).join('')}<th class="colh">Total</th></tr></thead><tbody>${list.map(a=>{let w=0,l=0,t=0; list.forEach(b=>{if(a!==b){const h=rec2(a,b.i,H2H_OPTS.po); if(h){w+=h.w;l+=h.l;t+=h.t;}}}); return `<tr><th class="rowh">${mlink(a.i,a.m.short)}</th>${list.map(b=>cell(a,b)).join('')}<td class="num"><b>${rec(w,l,t)}</b></td></tr>`;}).join('')}</tbody></table></div></div>`;
 }
@@ -1088,7 +1088,7 @@ function vAch(){
   const catalog=type=>BADGES.filter(b=>type==='f'?b.type==='f':b.type!=='f').map(b=>{
     const holders=C.filter(c=>c.badges[b.k]).sort((x,y)=>y.badges[b.k].length-x.badges[b.k].length);
     return `<div class="rec-row" style="grid-template-columns:30px 1fr auto"><span class="badge ${b.type==='f'?'f':b.type==='t'?'t':''}" style="padding:0;border:0"><i>${b.ab}</i></span><span><b>${b.name}</b><div class="sub">${b.d}</div><div class="sub" style="margin-top:3px">${holders.length?holders.slice(0,6).map(c=>`${mlink(c.i,c.m.short)} ${c.badges[b.k].length}`).join(' · '):'Nobody yet'}</div></span><span class="val">${sum(holders.map(c=>c.badges[b.k].length))}</span></div>`;}).join('');
-  return `<div class="head"><div><h2>Achievements</h2><p class="lede">Trophies for the good years and receipts for the bad ones. Every badge is earned from the actual results, and tapping any badge shows exactly when it happened.</p></div></div>
+  return `<div class="head"><div><h2>Achievements</h2></div></div>
   <h3>Trophy Case</h3>
   <div class="grid3">${RANKED.map(card).join('')}</div>
   <div class="grid2">
