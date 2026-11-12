@@ -207,6 +207,32 @@ a.riv:hover{border-left-color:var(--gold)}
 .ms-row:last-child{border-bottom:0}
 .bar{height:6px;border-radius:3px;background:var(--soft);margin-top:6px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--gold);border-radius:3px}
+.search{position:relative;width:min(340px,100%)}
+.search input{width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-family:var(--body);font-size:14px}
+.search input::placeholder{color:#9aa3b8}
+.search input:focus{outline:2px solid var(--accent);background:rgba(255,255,255,.14)}
+.q-res{position:absolute;right:0;left:0;top:calc(100% + 6px);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.25);z-index:50;overflow:hidden}
+.q-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line)}
+.q-item:last-child{border-bottom:0}
+.q-item b{display:block;font-size:14px}
+.q-item.on,.q-item:hover{background:var(--soft)}
+.q-type{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.q-empty{padding:10px 12px;color:var(--muted);font-size:14px}
+.recap{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);resize:vertical}
+.btn{padding:8px 14px;border-radius:8px;border:0;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}
+.story{color:var(--ink);margin-top:8px;max-width:80ch}
+.tl{display:flex;flex-direction:column}
+.tl-yr{display:grid;grid-template-columns:80px 1fr;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);position:relative}
+.tl-yr:last-child{border-bottom:0}
+.tl-y{font-family:var(--display);font-size:28px;font-weight:800;color:var(--accent);text-decoration:none;line-height:1}
+.tl-ev{display:flex;flex-direction:column;gap:6px}
+.tl-item{display:grid;grid-template-columns:82px 1fr;gap:10px;align-items:baseline;font-size:14px}
+.tl-title{background:var(--gold);color:#fff}.tl-record{background:var(--accent);color:#fff}.tl-league{background:var(--navy);color:#fff}.tl-format{background:var(--soft);color:var(--ink)}.tl-people{background:var(--good-bg);color:var(--good)}.tl-live{background:var(--accent);color:#fff}
+a.tile.bw{text-decoration:none;color:var(--ink);border-top:3px solid var(--line)}
+a.tile.bw:hover{background:var(--line)}
+.bw-good{border-top-color:var(--good)!important}.bw-bad{border-top-color:var(--bad)!important}
+@media (max-width:600px){.tl-yr{grid-template-columns:1fr;gap:6px}.tl-item{grid-template-columns:1fr;gap:2px}.search{width:100%}}
 .mu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
 .mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:12px}
 .mu-side{display:flex;flex-direction:column;gap:4px}
@@ -257,6 +283,7 @@ button.badge.on{background:var(--soft)}
         <h1><a href="#home" style="text-decoration:none;color:inherit">BVFFB</a></h1>
         <p>Bella Vista Fantasy Football · Est. 2011</p>
       </div>
+      <div class="search" role="search"><input id="q" type="search" placeholder="Search managers, teams, seasons" aria-label="Search managers, teams and seasons" autocomplete="off"><div id="q-res" class="q-res" role="listbox" hidden></div></div>
     </div>
     <nav class="tabs" id="tabs">
       <a href="#home" data-g="home">Home</a>
@@ -597,7 +624,7 @@ function barChart({items, h=240, yFmt, color='var(--accent)', hl, ref, low, max}
 const app=document.getElementById('app');
 
 function historyNav(on){
-  const items=[['standings','All-Time Standings'],['champions','The Champions'],['ratings','League Ratings'],['season-'+(on&&on.startsWith('season')?on.split('-')[1]:CUR),'Season Archive'],['trends','League Trends']];
+  const items=[['standings','All-Time Standings'],['champions','The Champions'],['ratings','League Ratings'],['season-'+(on&&on.startsWith('season')?on.split('-')[1]:CUR),'Season Archive'],['trends','League Trends'],['timeline','League Timeline']];
   return `<div class="subtabs">${items.map(([h,l])=>`<a class="chip ${on&&(on===h||(h.startsWith('season')&&on.startsWith('season')))?'on':''}" href="#${h}">${l}</a>`).join('')}</div>`;
 }
 function rafters(wrap){
@@ -715,10 +742,31 @@ function vSeason(y){
   } else if(S.complete){ bracket=`<div class="card"><h3>Road to the Title</h3><p class="note">No playoff in ${y}. The best regular season record took the title.</p></div>`; }
   const wks=[...new Set(reg.map(g=>g.wk))].sort((a,b)=>a-b);
   const weeksHtml=`<div class="card"><h3>Weekly Results</h3><div class="wkgrid">${wks.map(w=>`<div class="wk"><h4>Week ${w}</h4>${reg.filter(g=>g.wk===w).map(g=>{const a=[g.wt,g.ws],b=[g.lt,g.ls];return `<div class="gm"><span class="${g.tie?'':'w'}">${esc(a[0].n)}</span><span class="num ${g.tie?'':'w'}">${f2(a[1])}</span><span class="l">${esc(b[0].n)}</span><span class="num l">${f2(b[1])}</span></div>`;}).join('')}</div>`).join('')}</div></div>`;
+  // season story
+  const nmL=i=>mlink(i,M[i].name);
+  let story='';
+  if(S.complete){const ch=S.champ, fin=S.final;
+    story=`${nmL(ch.m)} won the ${y} title with ${esc(ch.n)}, going ${rec(ch.w,ch.l,ch.t)}${S.po?` as the ${ord(ch.seed)} seed`:''}${fin?` and beating ${nmL(fin.lose)} ${f2(fin.ws)}–${f2(fin.ls)} in the final`:''}. `;
+    if(S.topSeed!==ch) story+=`${nmL(S.topSeed.m)} had the best regular season at ${rec(S.topSeed.w,S.topSeed.l,S.topSeed.t)}${S.topSeed.f?` but finished ${ord(S.topSeed.f)}`:''}. `;
+    story+=`${S.pfLeader===ch?'The champion also':nmL(S.pfLeader.m)} led the league with ${f0(S.pfLeader.pf)} points, and ${nmL(S.last.m)} finished last.`;
+  } else { const lead=S.list.slice().sort((a,b)=>a.seed-b.seed)[0];
+    story=`Through Week ${curWeek}, ${nmL(lead.m)} leads at ${rec(lead.w,lead.l,lead.t)}. ${S.pfLeader===lead?'They have also':nmL(S.pfLeader.m)+' has'} scored the most points (${f0(S.pfLeader.pf)}).`; }
+  // season awards
+  const L=S.list, aw=[];
+  const best=L.slice().sort((a,b)=>b.apPct-a.apPct)[0]; aw.push(['Best Team',best,`All-Play ${pct(best.apPct)} · ${rec(best.w,best.l,best.t)}`]);
+  const lk=L.slice().sort((a,b)=>b.luck-a.luck); aw.push(['Luckiest',lk[0],`${sgn(lk[0].luck)} wins vs All-Play`]); aw.push(['Unluckiest',lk[lk.length-1],`${sgn(lk[lk.length-1].luck)} wins vs All-Play`]);
+  const delta=L.map(t=>{const p=C[t.m].teams.find(x=>x.y===y-1); return p?{t,p,d:t.wp-p.wp}:null;}).filter(Boolean);
+  if(delta.length){const up=delta.slice().sort((a,b)=>b.d-a.d)[0], dn=delta.slice().sort((a,b)=>a.d-b.d)[0];
+    if(up.d>0) aw.push(['Comeback Team',up.t,`${rec(up.p.w,up.p.l,up.p.t)} in ${y-1} to ${rec(up.t.w,up.t.l,up.t.t)}`]);
+    if(dn.d<0) aw.push(['Biggest Drop-off',dn.t,`${rec(dn.p.w,dn.p.l,dn.p.t)} in ${y-1} to ${rec(dn.t.w,dn.t.l,dn.t.t)}`]);}
+  const td=L.slice().sort((a,b)=>b.ap.hi-a.ap.hi)[0]; aw.push(['Top Dog',td,`${td.ap.hi} weekly high score${td.ap.hi===1?'':'s'}`]);
+  const tough=L.slice().sort((a,b)=>b.pa-a.pa)[0]; aw.push(['Toughest Schedule',tough,`${f0(tough.pa)} points allowed`]);
+  const awardsHtml=`<div class="card"><h3>${S.complete?'Season Awards':'Season Awards So Far'}</h3><div class="tiles">${aw.map(([k,tt,d])=>`<div class="tile"><div class="k">${k}</div><div class="v" style="font-size:22px">${mlink(tt.m,M[tt.m].short)}</div><div class="sub">${esc(tt.n)}</div><div class="sub">${esc(d)}</div></div>`).join('')}</div></div>`;
   return `${historyNav('season-'+y)}${yearChips}
-  <div class="head"><div><h2>${y} Season</h2><p class="lede">${S.list.length} teams · ${S.reg}-week regular season${S.po?` · ${S.po}-team playoff`:' · no playoff'}${S.complete?'':` · in progress through Week ${curWeek}`}</p></div></div>
+  <div class="head"><div><h2>${y} Season</h2><p class="lede">${S.list.length} teams · ${S.reg}-week regular season${S.po?` · ${S.po}-team playoff`:' · no playoff'}${S.complete?'':` · in progress through Week ${curWeek}`}</p><p class="lede story">${story}</p></div></div>
   <div class="tiles">${tiles.map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="sub">${t[2]}</div></div>`).join('')}</div>
-  <div class="card"><h3>Final Standings</h3>${table('t-season',cols,standings,'f','asc')}</div>
+  ${awardsHtml}
+  <div class="card"><h3>${S.complete?'Final Standings':'Standings'}</h3>${table('t-season',cols,standings,'f','asc')}</div>
   ${bracket}${weeksHtml}`;
 }
 
@@ -985,6 +1033,23 @@ function badgeChips(c,compact){
   if(!ks.length) return '<span class="note">No badges yet.</span>';
   return `<div class="badgewrap"><div class="badges">${ks.map(b=>`<button type="button" class="badge ${b.type==='f'?'f':b.type==='t'?'t':''}" data-badge="${b.k}" data-m="${c.i}" aria-expanded="false"><i>${b.ab}</i>${b.name}${c.badges[b.k].length>1?` <b>×${c.badges[b.k].length}</b>`:''}</button>`).join('')}</div><div class="bdetail" hidden></div></div>`;
 }
+function bestWorst(c){
+  const done=c.teams.filter(t=>SEASONS[t.y].complete); if(!done.length) return '';
+  const rel=t=>(t.ppg/SEASONS[t.y].lgPpg-1)*100;
+  const pick=(arr,cmp)=>arr.slice().sort(cmp)[0];
+  const best=pick(done,(a,b)=>a.f-b.f||b.wp-a.wp), worst=pick(done,(a,b)=>b.f-a.f||a.wp-b.wp);
+  const hot=pick(done,(a,b)=>rel(b)-rel(a)), cold=pick(done,(a,b)=>rel(a)-rel(b));
+  const lucky=pick(done,(a,b)=>b.luck-a.luck), unlucky=pick(done,(a,b)=>a.luck-b.luck);
+  const tile=(k,t,extra,cls)=>`<a class="tile bw ${cls||''}" href="#season-${t.y}"><div class="k">${k}</div><div class="v num">${t.y}</div><div class="sub">${esc(t.n)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${ord(t.f)}${extra?' · '+extra:''}</div></a>`;
+  return `<div class="card"><h3>Best and Worst Seasons</h3><div class="tiles">
+    ${tile('Best season',best,best.f===1?'champion':'','bw-good')}
+    ${tile('Worst season',worst,worst===SEASONS[worst.y].last?'last place':'','bw-bad')}
+    ${tile('Best scoring',hot,`${sgn(rel(hot))}% vs league`,'bw-good')}
+    ${tile('Worst scoring',cold,`${sgn(rel(cold))}% vs league`,'bw-bad')}
+    ${tile('Luckiest',lucky,`${sgn(lucky.luck)} wins`,'')}
+    ${tile('Unluckiest',unlucky,`${sgn(unlucky.luck)} wins`,'')}
+  </div></div>`;
+}
 function vFranchise(i){
   const sel=`<div class="ctrl"><label for="fsel">Franchise</label><select id="fsel">${RANKED.map(c=>`<option value="${c.i}" ${c.i===+i?'selected':''}>${esc(c.name)}${c.active?'':' (former)'}</option>`).join('')}</select></div>`;
   if(i==null||!C[i]) i=(ACTIVE.find(c=>c.name==='Charles Arthur')||RANKED[0]).i;
@@ -1038,6 +1103,7 @@ function vFranchise(i){
     <div class="card"><h3>Career Arc</h3><div class="legend"><span style="--c:var(--accent)">Final finish</span><span style="--c:var(--muted)">Regular season seed</span></div>${chart}</div>
     <div class="card"><h3>Points Per Game by Season</h3>${rel}<div class="legend"><span style="--c:var(--accent)">Beat the league average</span><span style="--c:var(--muted)">Below average</span><span style="--c:var(--ink)">League average (dashed)</span></div><p class="note">Above the league average in ${above} of ${c.teams.length} seasons.</p></div>
   </div>
+  ${bestWorst(c)}
   <div class="card"><h3>Season by Season</h3>${table('t-flog',cols,c.teams.slice().reverse(),'y','desc')}</div>
   <div class="card"><h3>Rivalries</h3>
     <div class="tiles" style="margin-bottom:14px">
@@ -1190,51 +1256,49 @@ function rivalrySpotlight(){
 }
 
 // ----- League Wire & Milestone Watch (home) -----
-function leagueWire(){
-  const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS;
-  const reg=S.games.filter(g=>!g.po);
-  const wk=reg.length?Math.max(...reg.map(g=>g.wk)):0; if(!wk) return '';
+function upTo(x,y,wk){return x.y<y||(x.y===y&&x.wk<=wk);}
+function wireItems(S,wk,latest){
   const wg=S.games.filter(g=>g.wk===wk&&!g.multi);
-  const SG=GAMES.filter(g=>!g.multi);
+  const SG=GAMES.filter(g=>!g.multi&&upTo(g,S.y,wk));
   const allSc=SG.flatMap(g=>[{m:g.h,s:g.hs,g},{m:g.a,s:g.as,g}]).sort((a,b)=>b.s-a.s);
   const items=[];
   const add=(tag,cls,html,w=1)=>items.push({tag,cls,html,w});
   const nm=i=>`<a class="mgr" href="#franchise-${i}">${esc(M[i].short)}</a>`;
-  // top score of the week and its all-time rank
   const wsc=wg.flatMap(g=>[{m:g.h,s:g.hs,g,t:g.ht},{m:g.a,s:g.as,g,t:g.at}]).sort((a,b)=>b.s-a.s);
   if(wsc.length){const top=wsc[0], r=allSc.findIndex(x=>x.g===top.g&&x.m===top.m)+1;
     add('High score','w-rec',`${nm(top.m)} led Week ${wk} with <b>${f2(top.s)}</b>${r<=50?`, the <b>${ord(r)}-best</b> score in league history`:''}.`,r<=25?3:2);
     const low=wsc[wsc.length-1]; const lr=allSc.length-allSc.findIndex(x=>x.g===low.g&&x.m===low.m);
     if(lr<=40) add('Low point','w-bad',`${nm(low.m)} managed just <b>${f2(low.s)}</b>, the ${ord(lr)}-lowest score ever.`,2);}
-  // blowout and nail-biter
   const nt=wg.filter(g=>!g.tie);
   const blow=nt.slice().sort((a,b)=>b.margin-a.margin)[0];
   if(blow){const r=SG.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin).indexOf(blow)+1;
     if(blow.margin>=40) add('Blowout','w-rec',`${nm(blow.win)} crushed ${nm(blow.lose)} by <b>${f1(blow.margin)}</b>${r<=30?`, the ${ord(r)}-biggest margin ever`:''}.`,r<=30?2:1);}
   const close=nt.slice().sort((a,b)=>a.margin-b.margin)[0];
   if(close&&close.margin<5) add('Nail-biter','w-neu',`${nm(close.win)} edged ${nm(close.lose)} by <b>${f2(close.margin)}</b>, ${f2(close.ws)}–${f2(close.ls)}.`,2);
-  // upset (records entering the week)
   const ups=nt.filter(g=>g.hRec&&g.aRec).map(g=>{const wr=g.win===g.h?g.hRec:g.aRec, lr=g.win===g.h?g.aRec:g.hRec; return {g,wr,lr,d:(lr.w-lr.l)-(wr.w-wr.l)};}).filter(x=>x.d>=4).sort((a,b)=>b.d-a.d)[0];
   if(ups) add('Upset','w-neu',`${rec(ups.wr.w,ups.wr.l)} ${nm(ups.g.win)} took down ${rec(ups.lr.w,ups.lr.l)} ${nm(ups.g.lose)}.`,2);
-  // head-to-head streaks extended this week
-  wg.forEach(g=>{ if(g.tie) return; const h=C[g.win].h2h[g.lose]; const L=h.list; let n=0; for(let k=L.length-1;k>=0&&L[k].r==='W';k--)n++;
-    if(n>=5) add('Rivalry','w-neu',`${nm(g.win)} has now beaten ${nm(g.lose)} <b>${n} straight</b> (${rec(h.w,h.l,h.t)} all-time).`,n>=10?3:2);
-    else if(h.n>=15&&Math.abs(h.w-h.l)<=1) add('Rivalry','w-neu',`${nm(g.win)} evened things up${h.w===h.l?'':' again'} with ${nm(g.lose)}: <b>${rec(h.w,h.l,h.t)}</b> after ${h.n} meetings.`,1); });
-  // active streaks
-  if(!curS.complete){
-    C.filter(c=>c.active&&c.curStreak).forEach(c=>{const n=parseInt(c.curStreak.slice(1)); if(n>=4) add('Streak',c.curStreak[0]==='W'?'w-good':'w-bad',`${nm(c.i)} has ${c.curStreak[0]==='W'?'won':'lost'} <b>${n} straight</b>.`,n>=6?2:1);});
-  }
-  // milestones crossed this week
+  wg.forEach(g=>{ if(g.tie) return; const L=C[g.win].h2h[g.lose].list.filter(x=>upTo(x,S.y,wk)); let n=0; for(let k=L.length-1;k>=0&&L[k].r==='W';k--)n++;
+    const w=L.filter(x=>x.r==='W').length, l=L.filter(x=>x.r==='L').length, tt=L.length-w-l;
+    if(n>=5) add('Rivalry','w-neu',`${nm(g.win)} has now beaten ${nm(g.lose)} <b>${n} straight</b> (${rec(w,l,tt)} all-time).`,n>=10?3:2);
+    else if(L.length>=15&&Math.abs(w-l)<=1) add('Rivalry','w-neu',`${nm(g.win)} pulled ${w===l?'even with':'within one of'} ${nm(g.lose)}: <b>${rec(w,l,tt)}</b> after ${L.length} meetings.`,1); });
+  // streaks entering/after this week (regular season, this season and prior)
+  C.filter(c=>c.teams.some(t=>t.y===S.y)).forEach(c=>{const gs=c.games.filter(x=>upTo(x,S.y,wk)); const last=gs[gs.length-1]; if(!last||last.y!==S.y||last.wk!==wk) return;
+    let n=0; for(let k=gs.length-1;k>=0&&gs[k].r===last.r;k--)n++; if(n>=4&&last.r!=='T') add('Streak',last.r==='W'?'w-good':'w-bad',`${nm(c.i)} has ${last.r==='W'?'won':'lost'} <b>${n} straight</b>.`,n>=6?2:1);});
   const LV={wins:[50,100,150,200],pts:[10000,15000,20000,25000,30000]};
-  C.filter(c=>c.active).forEach(c=>{const thisWk=c.games.filter(x=>x.y===S.y&&x.wk===wk);
-    if(!thisWk.length) return; const wNow=c.w, wBefore=c.w-thisWk.filter(x=>x.r==='W'&&!x.po).length, pNow=c.pf, pBefore=c.pf-sum(thisWk.filter(x=>!x.po).map(x=>x.ms));
-    LV.wins.forEach(L=>{if(wBefore<L&&wNow>=L) add('Milestone','w-gold',`${nm(c.i)} reached <b>${L} career wins</b>.`,3);});
-    LV.pts.forEach(L=>{if(pBefore<L&&pNow>=L) add('Milestone','w-gold',`${nm(c.i)} passed <b>${f0(L)} career points</b>.`,3);});});
-  // playoff odds headline
-  if(!curS.complete&&curS.upcoming&&curS.upcoming.length){const NM=nowModel(); const fav=curS.list.slice().sort((a,b)=>NM.res[b.id].title-NM.res[a.id].title)[0];
+  C.forEach(c=>{const wkG=c.games.filter(x=>x.y===S.y&&x.wk===wk&&!x.po); if(!wkG.length) return;
+    const prior=c.games.filter(x=>!x.po&&upTo(x,S.y,wk)), after={w:prior.filter(x=>x.r==='W').length,p:sum(prior.map(x=>x.ms))}, before={w:after.w-wkG.filter(x=>x.r==='W').length,p:after.p-sum(wkG.map(x=>x.ms))};
+    LV.wins.forEach(L=>{if(before.w<L&&after.w>=L) add('Milestone','w-gold',`${nm(c.i)} reached <b>${L} career wins</b>.`,3);});
+    LV.pts.forEach(L=>{if(before.p<L&&after.p>=L) add('Milestone','w-gold',`${nm(c.i)} passed <b>${f0(L)} career points</b>.`,3);});});
+  if(latest&&!curS.complete&&S===curS&&curS.upcoming&&curS.upcoming.length){const NM=nowModel(); const fav=curS.list.slice().sort((a,b)=>NM.res[b.id].title-NM.res[a.id].title)[0];
     const bubble=curS.list.filter(t=>{const p=NM.res[t.id].po/NM.N; return p>.3&&p<.7;}).sort((a,b)=>NM.res[b.id].po-NM.res[a.id].po);
     add('Odds','w-neu',`${nm(fav.m)} is the title favorite at <b>${f0(NM.res[fav.id].title/NM.N*100)}%</b>.${bubble.length?` On the bubble: ${bubble.map(t=>`${nm(t.m)} (${f0(NM.res[t.id].po/NM.N*100)}%)`).join(', ')}.`:''}`,2);}
-  const top=items.sort((a,b)=>b.w-a.w).slice(0,8);
+  return items.sort((a,b)=>b.w-a.w).slice(0,8);
+}
+function leagueWire(){
+  const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS;
+  const reg=S.games.filter(g=>!g.po);
+  const wk=reg.length?Math.max(...reg.map(g=>g.wk)):0; if(!wk) return '';
+  const top=wireItems(S,wk,true);
   return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>League Wire</h3><a class="chip" href="#now">${S.y} Week ${wk}</a></div><div class="wire">${top.map(x=>`<div class="wire-item"><span class="wtag ${x.cls}">${x.tag}</span><span>${x.html}</span></div>`).join('')}</div></div>`;
 }
 function milestoneWatch(){
@@ -1250,6 +1314,112 @@ function milestoneWatch(){
     rows.push({c,label,v,L,need,fm,pct:(v-prev)/(L-prev),close:need/L});}));
   const top=rows.sort((a,b)=>a.close-b.close).slice(0,6);
   return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>Milestone Watch</h3><a class="chip" href="#records-career">All milestones</a></div><div class="rec-list">${top.map(r=>`<div class="ms-row"><div class="head" style="align-items:baseline"><span>${mlink(r.c.i)} <span class="sub">needs ${r.fm(r.need)} for ${r.fm(r.L)} ${r.label}</span></span><span class="sub num">${r.fm(r.v)}</span></div><div class="bar"><i style="width:${Math.max(4,Math.min(100,r.pct*100))}%"></i></div></div>`).join('')}</div></div>`;
+}
+
+// ----- Weekly recap (plain text for the group chat) -----
+let RECAP_WK=null;
+const plain=h=>h.replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+function recapText(S,wk){
+  const reg=S.games.filter(g=>!g.po), wg=reg.filter(g=>g.wk===wk);
+  const lastWk=Math.max(...reg.map(g=>g.wk)), latest=wk===lastWk;
+  const sh=i=>M[i].short;
+  const lines=[`BVFFB ${S.y} · Week ${wk} Recap`,''];
+  const sc=wg.flatMap(g=>[[g.ht,g.hs],[g.at,g.as]]).sort((a,b)=>b[1]-a[1]);
+  const nt=wg.filter(g=>!g.tie), bl=nt.slice().sort((a,b)=>b.margin-a.margin)[0], cl=nt.slice().sort((a,b)=>a.margin-b.margin)[0];
+  lines.push(`Top score: ${sh(sc[0][0].m)} (${sc[0][0].n}) ${f2(sc[0][1])}`);
+  lines.push(`Low score: ${sh(sc[sc.length-1][0].m)} (${sc[sc.length-1][0].n}) ${f2(sc[sc.length-1][1])}`);
+  if(bl) lines.push(`Blowout: ${sh(bl.win)} over ${sh(bl.lose)} by ${f1(bl.margin)}`);
+  if(cl) lines.push(`Nail-biter: ${sh(cl.win)} over ${sh(cl.lose)} by ${f2(cl.margin)}`);
+  lines.push('','RESULTS');
+  wg.forEach(g=>lines.push(`${sh(g.wt.m)} ${f2(g.ws)} def. ${sh(g.lt.m)} ${f2(g.ls)}`));
+  const heads=wireItems(S,wk,latest).filter(x=>!['High score','Blowout','Nail-biter'].includes(x.tag));
+  if(heads.length){lines.push('','HEADLINES'); heads.forEach(x=>lines.push(`- ${plain(x.html)}`));}
+  // standings through this week
+  const W={},L={},PF={}; S.list.forEach(t=>{W[t.id]=0;L[t.id]=0;PF[t.id]=0;});
+  reg.filter(g=>g.wk<=wk).forEach(g=>{PF[g.ht.id]+=g.hs;PF[g.at.id]+=g.as; if(g.hs>g.as){W[g.ht.id]++;L[g.at.id]++;} else if(g.as>g.hs){W[g.at.id]++;L[g.ht.id]++;}});
+  const ord_=S.list.slice().sort((a,b)=>W[b.id]-W[a.id]||PF[b.id]-PF[a.id]);
+  lines.push('','STANDINGS');
+  ord_.forEach((t,k)=>{lines.push(`${k+1}. ${sh(t.m)} ${W[t.id]}-${L[t.id]} (${f1(PF[t.id])})`); if(S.po&&k===S.po-1) lines.push('---- playoff line ----');});
+  if(latest&&S===curS&&!S.complete&&S.upcoming.length){
+    const NM=nowModel(); const nw=Math.min(...S.upcoming.map(g=>g.wk));
+    const best=S.upcoming.filter(g=>g.wk===nw).map(g=>({g,h:C[g.ht.m].h2h[g.at.m]})).sort((a,b)=>((b.h?b.h.n:0)-3*(b.h?Math.abs(b.h.w-b.h.l):0))-((a.h?a.h.n:0)-3*(a.h?Math.abs(a.h.w-a.h.l):0)))[0];
+    lines.push('','PLAYOFF ODDS');
+    const pp=x=>{const v=x/NM.N*100; return v>=99.5&&v<100?'99':v>0&&v<0.5?'<1':f0(v);}; S.list.slice().sort((a,b)=>NM.res[b.id].po-NM.res[a.id].po).forEach(t=>lines.push(`${sh(t.m)}: ${NM.status[t.id].clinched?'clinched':pp(NM.res[t.id].po)+'% playoffs'}, ${pp(NM.res[t.id].title)}% title`));
+    if(best){const g=best.g,h=best.h; lines.push('',`GAME TO WATCH, WEEK ${nw}: ${sh(g.ht.m)} vs ${sh(g.at.m)}${h?` (${h.w}-${h.l}${h.t?'-'+h.t:''} all-time)`:''}`);}
+  }
+  lines.push('','Full stats: https://carthur010.github.io/BVFFB/');
+  return lines.join('\n');
+}
+function recapCard(){
+  const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS;
+  const reg=S.games.filter(g=>!g.po); if(!reg.length) return '';
+  const weeks=[...new Set(reg.map(g=>g.wk))].sort((a,b)=>b-a);
+  if(RECAP_WK==null||!weeks.includes(RECAP_WK)) RECAP_WK=weeks[0];
+  return `<div class="card" id="recap"><div class="head" style="margin-bottom:10px"><div><h3>Weekly Recap</h3><p class="note" style="margin:4px 0 0">Ready to paste into the group chat.</p></div>
+    <div class="ctrl"><label for="recap-wk">Week</label><select id="recap-wk">${weeks.map(w=>`<option value="${w}" ${w===RECAP_WK?'selected':''}>Week ${w}</option>`).join('')}</select><button type="button" class="btn" id="recap-copy">Copy recap</button><span class="note" id="recap-msg" role="status"></span></div></div>
+    <textarea id="recap-text" class="recap" readonly rows="16">${esc(recapText(S,RECAP_WK))}</textarea></div>`;
+}
+// ----- League timeline -----
+function vTimeline(){
+  const ev={}; const add=(y,type,text)=>{(ev[y]=ev[y]||[]).push({type,text});};
+  let prevN=null, prevPo=null, prevReg=null, decimals=false, hiRec=0;
+  const titled=new Set(), seenM=new Set();
+  YEARS.forEach((y,k)=>{const S=SEASONS[y], n=S.list.length;
+    if(k===0) add(y,'league',`The league is founded with ${n} teams.`);
+    else if(n!==prevN) add(y,'league',`The league ${n>prevN?'expands':'shrinks'} from ${prevN} to ${n} teams.`);
+    if(k>0&&S.po!==prevPo) add(y,'format',S.po?`The playoff field ${prevPo?`changes from ${prevPo} to ${S.po}`:`is set at ${S.po}`} teams${S.po===6?', with byes for the top two seeds':''}.`:'No playoff this season.');
+    if(k>0&&S.reg!==prevReg) add(y,'format',`The regular season ${S.reg>prevReg?'grows':'shrinks'} to ${S.reg} weeks.`);
+    if(!decimals&&S.games.some(g=>g.hs%1!==0||g.as%1!==0)){decimals=true; if(k>0) add(y,'format','Decimal scoring arrives.');}
+    if(S.twoWk) add(y,'format','Playoff matchups are two-week totals.');
+    const newbies=S.list.filter(t=>!seenM.has(t.m)); if(k>0&&newbies.length) add(y,'people',`New ${newbies.length>1?'managers':'manager'}: ${newbies.map(t=>`${mlink(t.m)} (${esc(t.n)})`).join(', ')}.`);
+    S.list.forEach(t=>seenM.add(t.m));
+    const leaving=S.list.filter(t=>!C[t.m].years.some(x=>x>y)&&y<CUR); if(leaving.length) add(y,'people',`Final season for ${leaving.map(t=>mlink(t.m)).join(', ')}.`);
+    // scoring record progression
+    S.games.filter(g=>!g.multi).sort((a,b)=>a.wk-b.wk).forEach(g=>{[[g.h,g.hs,g.ht],[g.a,g.as,g.at]].forEach(([m,s,t])=>{ if(s>hiRec){ if(hiRec>0) add(y,'record',`${mlink(m)} sets a new league scoring record: <b>${f2(s)}</b> in Week ${g.wk}${g.po?' (playoffs)':''}.`); hiRec=s; }});});
+    S.list.filter(t=>t.l===0&&t.games>0&&S.complete).forEach(t=>add(y,'record',`${mlink(t.m)} goes ${rec(t.w,t.l,t.t)}, a perfect regular season.`));
+    if(S.complete){const ch=S.champ, c=C[ch.m], nth=c.titles.indexOf(y)+1;
+      const fin=S.final; const vs=fin?` over ${mlink(fin.lose)}, ${f2(fin.ws)}–${f2(fin.ls)}`:'';
+      if(!titled.has(ch.m)) add(y,'title',`${mlink(ch.m)} wins a first title with ${esc(ch.n)}${vs}.`);
+      else add(y,'title',`${mlink(ch.m)} wins title No. ${nth}${vs}.${c.titles.includes(y-1)?' Back-to-back!':''}`);
+      titled.add(ch.m);
+      const most=Math.max(...C.map(x=>x.titles.filter(t=>t<=y).length)); if(nth===most&&nth>=3&&C.filter(x=>x.titles.filter(t=>t<=y).length===nth).length===1) add(y,'title',`${mlink(ch.m)} becomes the first ${nth}-time champion.`);
+    } else add(y,'live',`Season in progress. <a class="mgr" href="#now">See the ${y} race</a>.`);
+    prevN=n; prevPo=S.po; prevReg=S.reg;
+  });
+  const lab={league:'League',format:'Format',people:'Members',record:'Record',title:'Title',live:'Live'};
+  return `${historyNav('timeline')}
+  <div class="head"><div><h2>League Timeline</h2></div></div>
+  <div class="card"><div class="tl">${YEARS.slice().reverse().map(y=>`<div class="tl-yr"><a class="tl-y" href="#season-${y}">${y}</a><div class="tl-ev">${(ev[y]||[]).sort((a,b)=>['title','live','record','league','format','people'].indexOf(a.type)-['title','live','record','league','format','people'].indexOf(b.type)).map(e=>`<div class="tl-item"><span class="wtag tl-${e.type}">${lab[e.type]}</span><span>${e.text}</span></div>`).join('')}</div></div>`).join('')}</div></div>`;
+}
+// ----- Search -----
+let SIDX=null;
+function searchIndex(){
+  if(SIDX) return SIDX;
+  const out=[];
+  C.forEach(c=>out.push({k:c.name.toLowerCase(),label:c.name,sub:`${c.curTeam} · ${c.seasons} season${c.seasons>1?'s':''}`,href:'#franchise-'+c.i,type:'Manager'}));
+  const seenT=new Set();
+  YEARS.forEach(y=>SEASONS[y].list.forEach(t=>{const key=t.n.toLowerCase()+'|'+t.m; if(seenT.has(key)) return; seenT.add(key);
+    const yrs=C[t.m].teams.filter(x=>x.n===t.n).map(x=>x.y); out.push({k:t.n.toLowerCase(),label:t.n,sub:`${M[t.m].name} · ${yrs.length>1?`${yrs[0]}–${yrs[yrs.length-1]}`:yrs[0]}`,href:'#franchise-'+t.m,type:'Team'});}));
+  YEARS.forEach(y=>out.push({k:String(y),label:`${y} Season`,sub:SEASONS[y].complete?`Champion: ${M[SEASONS[y].champ.m].name}`:'In progress',href:'#season-'+y,type:'Season'}));
+  [['Home','#home'],[`${CUR} Season`,'#now'],['All-Time Standings','#standings'],['The Champions','#champions'],['League Ratings','#ratings'],['League Trends','#trends'],['League Timeline','#timeline'],['Record Book','#records'],['Head-to-Head','#h2h'],['Achievements','#achievements']].forEach(([l,h])=>out.push({k:l.toLowerCase(),label:l,sub:'Page',href:h,type:'Page'}));
+  SIDX=out; return out;
+}
+function runSearch(q){
+  q=q.trim().toLowerCase(); if(!q) return [];
+  const words=q.split(/\s+/);
+  return searchIndex().map(x=>{if(!words.every(w=>x.k.includes(w))) return null; const s=(x.k.startsWith(q)?0:x.k.split(/\s+/).some(w=>w.startsWith(words[0]))?1:2)+({Manager:0,Season:.1,Team:.2,Page:.3}[x.type]); return {...x,s};}).filter(Boolean).sort((a,b)=>a.s-b.s).slice(0,8);
+}
+function wireSearch(){
+  const inp=document.getElementById('q'), box=document.getElementById('q-res'); if(!inp||inp.dataset.wired) return; inp.dataset.wired='1';
+  let sel=0, res=[];
+  const draw=()=>{ if(!res.length){box.hidden=!inp.value.trim(); box.innerHTML=inp.value.trim()?'<div class="q-empty">No matches</div>':''; return;}
+    box.hidden=false; box.innerHTML=res.map((r,k)=>`<a href="${r.href}" class="q-item ${k===sel?'on':''}" role="option"><span><b>${esc(r.label)}</b><span class="sub">${esc(r.sub)}</span></span><span class="q-type">${r.type}</span></a>`).join('');};
+  const close=()=>{box.hidden=true; inp.value=''; res=[];};
+  inp.addEventListener('input',()=>{res=runSearch(inp.value); sel=0; draw();});
+  inp.addEventListener('keydown',e=>{ if(e.key==='ArrowDown'){sel=Math.min(sel+1,res.length-1);draw();e.preventDefault();} else if(e.key==='ArrowUp'){sel=Math.max(sel-1,0);draw();e.preventDefault();} else if(e.key==='Enter'&&res[sel]){location.hash=res[sel].href.slice(1); close(); inp.blur();} else if(e.key==='Escape'){close(); inp.blur();}});
+  box.addEventListener('click',e=>{ if(e.target.closest('a')) setTimeout(close,0);});
+  document.addEventListener('click',e=>{ if(!e.target.closest('.search')) box.hidden=true;});
+  document.addEventListener('keydown',e=>{ if(e.key==='/'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){e.preventDefault(); inp.focus();}});
 }
 
 // ----- Home (history front page) -----
@@ -1451,6 +1621,7 @@ function vNow(){
   const standRows=stand.map((t,k)=>`<tr><td class="r num">${t.seed}</td><td class="pin">${tm(t)}</td><td class="r num">${rec(t.w,t.l,t.t)}</td><td class="r num">${f2(t.pf)}</td><td class="r num">${f2(t.pa)}</td><td class="r num"><span class="${(C[t.m].curStreak||'')[0]==='W'?'pos':'neg'}">${C[t.m].curStreak||''}</span></td></tr>${k===po-1?`<tr><td colspan="6" style="padding:0;border-bottom:2px dashed var(--accent)"></td></tr>`:''}`).join('');
   return `
   <div class="head"><div><h2>${CUR} Season</h2><p class="lede">Through Week ${lastWk} of ${G}. ${esc(M[stand[0].m].short)} leads at ${rec(stand[0].w,stand[0].l,stand[0].t)}. ${G-lastWk>0?`${G-lastWk} week${G-lastWk>1?'s':''} left before the ${po}-team playoff.`:'Regular season is done.'}</p></div><a class="chip" href="#season-${CUR}">Every week's results</a></div>
+  ${recapCard()}
   ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} Matchups</h3><span class="sub">Win chances from each team's ${CUR} scoring</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
   <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule, using each team's scoring this season. Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
   <div class="grid2">
@@ -1485,6 +1656,7 @@ function route(){
   else if(h==='champions') html=vChampions();
   else if(h==='ratings') html=vRatings();
   else if(h==='trends') html=vTrends();
+  else if(h==='timeline') html=vTimeline();
   else if(h.startsWith('season')) html=vSeason(h.split('-')[1]||CUR);
   else if(h.startsWith('records')){g='records'; html=vRecords(h.split('-')[1]);}
   else if(h.startsWith('franchise')){g='franchise'; const p=h.split('-')[1]; html=vFranchise(p==null?null:+p);}
@@ -1497,6 +1669,11 @@ function route(){
   wire();
 }
 function wire(){
+  wireSearch();
+  const rw=document.getElementById('recap-wk'); if(rw) rw.onchange=()=>{RECAP_WK=+rw.value; const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS; document.getElementById('recap-text').value=recapText(S,RECAP_WK); document.getElementById('recap-msg').textContent='';};
+  const rc=document.getElementById('recap-copy'); if(rc) rc.onclick=async()=>{const ta=document.getElementById('recap-text'), msg=document.getElementById('recap-msg');
+    try{ await navigator.clipboard.writeText(ta.value); msg.textContent='Copied. Paste it in the chat.'; }
+    catch(e){ ta.focus(); ta.select(); try{ document.execCommand('copy'); msg.textContent='Copied. Paste it in the chat.'; }catch(_){ msg.textContent='Select the text and copy it manually.'; } } };
   const fs=document.getElementById('fsel'); if(fs) fs.onchange=()=>{location.hash='franchise-'+fs.value;};
   const va=document.getElementById('vs-a'), vb=document.getElementById('vs-b');
   if(va&&vb){ const go=()=>{ if(location.hash.startsWith('#versus')) location.hash=`versus-${va.value}-${vb.value}`; else { document.getElementById('versus').outerHTML=vVersusBody(+va.value,+vb.value,true); wire(); } }; va.onchange=go; vb.onchange=go; }
