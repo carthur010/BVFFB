@@ -89,7 +89,7 @@ tbody tr:hover{background:var(--soft)}
 
 /* rafters */
 .rafters{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
-.banner{flex:0 0 132px;background:var(--navy);color:#fff;padding:14px 10px 26px;text-align:center;clip-path:polygon(0 0,100% 0,100% 100%,50% 88%,0 100%);border-top:4px solid var(--accent);text-decoration:none;display:flex;flex-direction:column;gap:4px}
+.banner{flex:0 0 140px;background:var(--navy);color:#fff;padding:14px 10px 26px;text-align:center;clip-path:polygon(0 0,100% 0,100% 100%,50% 88%,0 100%);border-top:4px solid var(--accent);text-decoration:none;display:flex;flex-direction:column;gap:4px}
 .banner .yr{font-family:var(--display);font-size:30px;font-weight:800;color:var(--gold);line-height:1}
 .banner .who{font-family:var(--display);font-weight:700;font-size:17px;text-transform:uppercase;line-height:1.05}
 .banner .tm{font-size:12px;color:#b8c0d4;line-height:1.2}
@@ -569,7 +569,7 @@ function historyNav(on){
   return `<div class="subtabs">${items.map(([h,l])=>`<a class="chip ${on&&(on===h||(h.startsWith('season')&&on.startsWith('season')))?'on':''}" href="#${h}">${l}</a>`).join('')}</div>`;
 }
 function rafters(){
-  return `<div class="rafters">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].short)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
+  return `<div class="rafters">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
 }
 
 let STAND_MORE=false;
