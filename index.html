@@ -89,7 +89,8 @@ tbody tr:hover{background:var(--soft)}
 
 /* rafters */
 .rafters{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
-.rafters-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px 10px;overflow:visible}
+.rafters-wrap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px 10px;overflow:visible}
+@media (max-width:600px){.rafters-wrap{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .rafters-wrap .banner{flex:none;width:auto}
 .banner{flex:0 0 140px;background:var(--navy);color:#fff;padding:14px 10px 26px;text-align:center;clip-path:polygon(0 0,100% 0,100% 100%,50% 88%,0 100%);border-top:4px solid var(--accent);text-decoration:none;display:flex;flex-direction:column;gap:4px}
 .banner .yr{font-family:var(--display);font-size:30px;font-weight:800;color:var(--gold);line-height:1}
