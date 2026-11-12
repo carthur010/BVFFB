@@ -211,6 +211,27 @@ button.badge.on{background:var(--soft)}
 <script>
 window.BOOT = function(DATA){
 "use strict";
+// ---------- league corrections ESPN can't express ----------
+// 2012: ESPN ran all 17 weeks as regular season. The league treated Weeks 1-13 as the regular season and
+// Weeks 14-17 as a 4-team playoff of two-week matchups (14+15, 16+17). Final placements follow ESPN's trophies.
+(function fix2012(){
+  const s=DATA.S&&DATA.S['2012']; if(!s||s.fixed) return;
+  const games=s.G.split(';').map(x=>{const p=x.split(',');return {wk:+p[0],h:+p[1],hs:+p[2],a:+p[3],as:+p[4]};});
+  const reg=games.filter(g=>g.wk<=13), rec={};
+  s.T.forEach(t=>rec[t[0]]={w:0,l:0,t:0,pf:0,pa:0});
+  reg.forEach(g=>{const H=rec[g.h],A=rec[g.a]; H.pf+=g.hs;H.pa+=g.as;A.pf+=g.as;A.pa+=g.hs; if(g.hs>g.as){H.w++;A.l++;}else if(g.as>g.hs){A.w++;H.l++;}else{H.t++;A.t++;}});
+  const order=s.T.map(t=>t[0]).sort((a,b)=>(rec[b].w-rec[a].w)||(rec[b].pf-rec[a].pf));
+  s.T.forEach(t=>{const r=rec[t[0]]; t[4]=order.indexOf(t[0])+1; t[5]=r.w;t[6]=r.l;t[7]=r.t;t[8]=Math.round(r.pf*100)/100;t[9]=Math.round(r.pa*100)/100;});
+  const field=new Set(order.slice(0,4)), po=[];
+  [[14,15],[16,17]].forEach(([w1,w2])=>{
+    games.filter(g=>g.wk===w1&&field.has(g.h)&&field.has(g.a)).forEach(g=>{
+      const g2=games.find(x=>x.wk===w2&&((x.h===g.h&&x.a===g.a)||(x.h===g.a&&x.a===g.h))); if(!g2) return;
+      const hs=g.hs+(g2.h===g.h?g2.hs:g2.as), as=g.as+(g2.h===g.h?g2.as:g2.hs);
+      po.push([w1,g.h,hs,g.a,as,'P'].join(','));});
+  });
+  s.G=reg.map(g=>[g.wk,g.h,g.hs,g.a,g.as,'R'].join(',')).concat(po).join(';');
+  s.reg=13; s.po=4; s.fixed=true;
+})();
 // ---------- helpers ----------
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f2 = x => (x==null||isNaN(x))?'–':(+x).toFixed(2);
@@ -544,7 +565,7 @@ function vChampions(){
     {k:'y',label:'Season',f:r=>`<a class="mgr" href="#season-${r.y}">${r.y}</a>`},
     {k:'c',label:'Champion',pin:1,nosort:1,f:r=>`${mlink(r.S.champ.m)}<div class="sub">${esc(r.S.champ.n)} · ${rec(r.S.champ.w,r.S.champ.l,r.S.champ.t)}${r.S.po?` · ${r.S.champ.seed} seed`:''}</div>`},
     {k:'ru',label:'Runner-up',nosort:1,f:r=>`${mlink(r.S.ru.m)}<div class="sub">${esc(r.S.ru.n)}</div>`},
-    {k:'fs',label:'Title Game',nosort:1,f:r=>r.S.final?`<span class="num">${f2(r.S.final.ws)} – ${f2(r.S.final.ls)}</span>${r.S.twoWk?'<div class="sub">two-week final</div>':''}`:'<span class="sub">No playoff that year</span>'},
+    {k:'fs',label:'Title Game',nosort:1,f:r=>r.S.final?`<span class="num">${f2(r.S.final.ws)} – ${f2(r.S.final.ls)}</span><div class="sub">vs ${esc(M[r.S.final.lose].short)}${r.S.twoWk?' · two-week final':''}</div>`:'<span class="sub">No playoff that year</span>'},
     {k:'ts',label:'#1 Seed',nosort:1,f:r=>mlink(r.S.topSeed.m,M[r.S.topSeed.m].short)},
     {k:'pl',label:'Points Leader',nosort:1,f:r=>`${mlink(r.S.pfLeader.m,M[r.S.pfLeader.m].short)} <span class="sub num">${f0(r.S.pfLeader.pf)}</span>`},
     {k:'ls',label:'Last Place',nosort:1,f:r=>mlink(r.S.last.m,M[r.S.last.m].short)},
@@ -553,7 +574,7 @@ function vChampions(){
   const seedChamps=DONE.filter(y=>SEASONS[y].po>0).map(y=>SEASONS[y].champ.seed);
   const distinct=new Set(DONE.map(y=>SEASONS[y].champ.m)).size;
   return `${historyNav('champions')}
-  <div class="head"><div><h2>The Champions</h2><p class="lede">${DONE.length} completed seasons, ${distinct} different champions. The 2012 season had no playoff, so the title went to the best regular season record.</p></div></div>
+  <div class="head"><div><h2>The Champions</h2><p class="lede">${DONE.length} completed seasons, ${distinct} different champions. </p></div></div>
   <div class="card">${rafters()}</div>
   <div class="grid2">
     <div class="card"><h3>Title Count</h3><div class="rec-list">${tally.map((c,k)=>`<div class="rec-row"><span class="rk">${k+1}</span><span>${mlink(c.i)}<div class="sub">${c.titles.join(', ')}</div></span><span class="val">${c.titles.length}</span></div>`).join('')}</div></div>
@@ -620,7 +641,7 @@ function vSeason(y){
   let bracket='';
   if(po.length){
     const wks=[...new Set(po.map(g=>g.wk))].sort((a,b)=>a-b);
-    bracket=`<div class="card"><h3>Road to the Title</h3>${S.twoWk?'<p class="note">Playoff matchups this season were two-week totals.</p>':''}<div class="bracket">${wks.map((w,k)=>`<div class="round"><h4>${roundName(k,wks.length)} · Wk ${w}</h4>${po.filter(g=>g.wk===w).map(g=>{const rows=[[g.ht,g.hs],[g.at,g.as]].sort((a,b)=>a[0].seed-b[0].seed);return `<div class="match">${rows.map(([t,s])=>`<div class="${s===g.ws&&!g.tie?'w':''}"><span><span class="sub">${t.seed}</span> ${esc(t.n)}</span><span class="num">${f2(s)}</span></div>`).join('')}</div>`;}).join('')}</div>`).join('')}</div></div>`;
+    bracket=`<div class="card"><h3>Road to the Title</h3>${S.twoWk?'<p class="note">Playoff matchups this season were two-week totals.</p>':''}<div class="bracket">${wks.map((w,k)=>`<div class="round"><h4>${roundName(k,wks.length)} · ${y===2012?`Wks ${w}–${w+1}`:`Wk ${w}`}</h4>${po.filter(g=>g.wk===w).map(g=>{const rows=[[g.ht,g.hs],[g.at,g.as]].sort((a,b)=>a[0].seed-b[0].seed);return `<div class="match">${rows.map(([t,s])=>`<div class="${s===g.ws&&!g.tie?'w':''}"><span><span class="sub">${t.seed}</span> ${esc(t.n)}</span><span class="num">${f2(s)}</span></div>`).join('')}</div>`;}).join('')}</div>`).join('')}</div></div>`;
   } else if(S.complete){ bracket=`<div class="card"><h3>Road to the Title</h3><p class="note">No playoff in ${y}. The best regular season record took the title.</p></div>`; }
   const wks=[...new Set(reg.map(g=>g.wk))].sort((a,b)=>a-b);
   const weeksHtml=`<div class="card"><h3>Weekly Results</h3><div class="wkgrid">${wks.map(w=>`<div class="wk"><h4>Week ${w}</h4>${reg.filter(g=>g.wk===w).map(g=>{const a=[g.wt,g.ws],b=[g.lt,g.ls];return `<div class="gm"><span class="${g.tie?'':'w'}">${esc(a[0].n)}</span><span class="num ${g.tie?'':'w'}">${f2(a[1])}</span><span class="l">${esc(b[0].n)}</span><span class="num l">${f2(b[1])}</span></div>`;}).join('')}</div>`).join('')}</div></div>`;
@@ -780,7 +801,7 @@ function vRecords(sec){
     const seasonRun=(c,ok)=>{let best={n:0},cur=null,prev=null; c.teams.filter(t=>SEASONS[t.y].complete).forEach(t=>{ if(prev!=null&&t.y!==prev+1)cur=null; if(ok(t)){cur=cur?{...cur,n:cur.n+1,to:t.y}:{n:1,from:t.y,to:t.y}; if(cur.n>best.n)best={...cur};} else cur=null; prev=t.y;}); return best;};
     const vsRun=[]; CC.forEach(c=>Object.entries(c.h2h).forEach(([o,h])=>{const s=run(h.list,x=>x.r==='W'); if(s.n)vsRun.push({c,o:+o,s});}));
     const active=CC.filter(c=>c.active);
-    body=`<p class="note">Game streaks include playoffs and carry across seasons. Playoff streaks skip 2012, which had no playoff.</p><div class="grid3">
+    body=`<p class="note">Game streaks include playoffs and carry across seasons.</p><div class="grid3">
     ${recList('Longest Win Streak',CC.slice().sort((a,b)=>b.winStreak.n-a.winStreak.n).map(c=>({v:c.winStreak.n,who:mlink(c.i),det:sDet(c.winStreak)})),v=>v+' W')}
     ${recList('Longest Losing Streak',CC.slice().sort((a,b)=>b.loseStreak.n-a.loseStreak.n).map(c=>({v:c.loseStreak.n,who:mlink(c.i),det:sDet(c.loseStreak)})),v=>v+' L')}
     ${recList('Win Streak vs One Opponent',vsRun.sort((a,b)=>b.s.n-a.s.n).map(x=>({v:x.s.n,who:`${mlink(x.c.i)} <span class="sub">over</span> ${mlink(x.o,M[x.o].short)}`,det:sDet(x.s)})),v=>v+' W')}
