@@ -892,7 +892,7 @@ function vAch(){
 function vHome(){
   const totPts=sum(GAMES.flatMap(g=>[g.hs,g.as]));
   const nChamps=new Set(DONE.map(y=>SEASONS[y].champ.m)).size;
-  const strip=[[YEARS.length,'Seasons'],[GAMES.length.toLocaleString(),'Matchups'],[C.length,'Managers all-time'],[f0(totPts),'Points scored'],[nChamps,'Different champions']];
+  const strip=[[YEARS.length,'Seasons'],[nChamps,'Different champions']];
   // dynasty leaderboard
   const dyn=RANKED.slice(0,6);
   // record watch
