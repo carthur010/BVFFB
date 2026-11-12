@@ -280,7 +280,10 @@ const ord = n => n==null?'–':n+(['th','st','nd','rd'][(n%100>10&&n%100<14)?0:(
 const rec = (w,l,t) => t?`${w}-${l}-${t}`:`${w}-${l}`;
 
 // ---------- model ----------
-const M = DATA.M.map((name,i)=>({i,name,short:name.replace(/^(\S+)\s+(\S+).*$/,(m,a,b)=>name.includes('&')?name.split(' & ').map(n=>n.split(' ')[0]).join(' & '):a+' '+b[0]+'.')}));
+// Short names: first name only; a last initial is added only when two managers share a first name (e.g. Jack C. and Jack G.)
+const firstOf=n=>n.includes('&')?n.split(' & ').map(x=>x.split(' ')[0]).join(' & '):n.split(' ')[0];
+const firstCount={}; DATA.M.forEach(n=>{const f=firstOf(n); firstCount[f]=(firstCount[f]||0)+1;});
+const M = DATA.M.map((name,i)=>{const f=firstOf(name), parts=name.split(' '); return {i,name,short:firstCount[f]>1&&!name.includes('&')?`${f} ${parts[parts.length-1][0]}.`:f};});
 const YEARS = Object.keys(DATA.S).map(Number).sort((a,b)=>a-b);
 const SEASONS = {};
 const GAMES = [];
