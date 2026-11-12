@@ -218,6 +218,10 @@ a.riv:hover{border-left-color:var(--gold)}
 .q-item.on,.q-item:hover{background:var(--soft)}
 .q-type{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
 .q-empty{padding:10px 12px;color:var(--muted);font-size:14px}
+.recap-view{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 24px;font-size:14px}
+.rc-sec h4{margin:0 0 6px;font-family:var(--display);text-transform:uppercase;font-size:15px;letter-spacing:.04em;color:var(--accent)}
+.rc-sec>div{padding:2px 0;font-variant-numeric:tabular-nums}
+.rc-line{border-top:2px dashed var(--accent);margin:4px 0}
 .recap{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);resize:vertical}
 .btn{padding:8px 14px;border-radius:8px;border:0;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
 .btn:hover{filter:brightness(1.1)}
@@ -1350,14 +1354,24 @@ function recapText(S,wk){
   lines.push('','Full stats: https://carthur010.github.io/BVFFB/');
   return lines.join('\n');
 }
+function recapHtml(txt){
+  const L=txt.split('\n').slice(2).filter(l=>!l.startsWith('Full stats:'));
+  let out='', open=false;
+  L.forEach(l=>{ if(!l.trim()) return;
+    if(l.startsWith('GAME TO WATCH')||(/^[A-Z][A-Z ,0-9']+(:|$)/.test(l)&&l===l.toUpperCase()&&!/^\d/.test(l))){ if(open) out+='</div>'; const [h,...rest]=l.split(': '); out+=`<div class="rc-sec"><h4>${esc(h)}</h4>${rest.length?`<div>${esc(rest.join(': '))}</div>`:''}`; open=true; }
+    else if(l.startsWith('---- ')) out+='<div class="rc-line"></div>';
+    else { if(!open){out+='<div class="rc-sec"><h4>Highlights</h4>'; open=true;} out+=`<div>${esc(l.replace(/^- /,''))}</div>`; } });
+  if(open) out+='</div>';
+  return out;
+}
 function recapCard(){
   const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS;
   const reg=S.games.filter(g=>!g.po); if(!reg.length) return '';
   const weeks=[...new Set(reg.map(g=>g.wk))].sort((a,b)=>b-a);
   if(RECAP_WK==null||!weeks.includes(RECAP_WK)) RECAP_WK=weeks[0];
-  return `<div class="card" id="recap"><div class="head" style="margin-bottom:10px"><div><h3>Weekly Recap</h3><p class="note" style="margin:4px 0 0">Ready to paste into the group chat.</p></div>
-    <div class="ctrl"><label for="recap-wk">Week</label><select id="recap-wk">${weeks.map(w=>`<option value="${w}" ${w===RECAP_WK?'selected':''}>Week ${w}</option>`).join('')}</select><button type="button" class="btn" id="recap-copy">Copy recap</button><span class="note" id="recap-msg" role="status"></span></div></div>
-    <textarea id="recap-text" class="recap" readonly rows="16">${esc(recapText(S,RECAP_WK))}</textarea></div>`;
+  return `<div class="card" id="recap"><div class="head" style="margin-bottom:10px"><h3>Week ${RECAP_WK} Recap</h3>
+    <div class="ctrl"><label for="recap-wk">Week</label><select id="recap-wk">${weeks.map(w=>`<option value="${w}" ${w===RECAP_WK?'selected':''}>Week ${w}</option>`).join('')}</select></div></div>
+    <div class="recap-view">${recapHtml(recapText(S,RECAP_WK))}</div></div>`;
 }
 // ----- League timeline -----
 function vTimeline(){
@@ -1670,10 +1684,8 @@ function route(){
 }
 function wire(){
   wireSearch();
-  const rw=document.getElementById('recap-wk'); if(rw) rw.onchange=()=>{RECAP_WK=+rw.value; const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS; document.getElementById('recap-text').value=recapText(S,RECAP_WK); document.getElementById('recap-msg').textContent='';};
-  const rc=document.getElementById('recap-copy'); if(rc) rc.onclick=async()=>{const ta=document.getElementById('recap-text'), msg=document.getElementById('recap-msg');
-    try{ await navigator.clipboard.writeText(ta.value); msg.textContent='Copied. Paste it in the chat.'; }
-    catch(e){ ta.focus(); ta.select(); try{ document.execCommand('copy'); msg.textContent='Copied. Paste it in the chat.'; }catch(_){ msg.textContent='Select the text and copy it manually.'; } } };
+  const rw=document.getElementById('recap-wk'); if(rw) rw.onchange=()=>{RECAP_WK=+rw.value; document.getElementById('recap').outerHTML=recapCard(); wire();};
+
   const fs=document.getElementById('fsel'); if(fs) fs.onchange=()=>{location.hash='franchise-'+fs.value;};
   const va=document.getElementById('vs-a'), vb=document.getElementById('vs-b');
   if(va&&vb){ const go=()=>{ if(location.hash.startsWith('#versus')) location.hash=`versus-${va.value}-${vb.value}`; else { document.getElementById('versus').outerHTML=vVersusBody(+va.value,+vb.value,true); wire(); } }; va.onchange=go; vb.onchange=go; }
