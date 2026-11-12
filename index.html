@@ -266,7 +266,9 @@ YEARS.forEach(y=>{
   const s = DATA.S[y];
   const teams = {};
   s.T.forEach(t=>{teams[t[0]]={id:t[0],m:t[1],n:t[2],f:t[3],seed:t[4],w:t[5],l:t[6],t:t[7],pf:t[8],pa:t[9],y};});
-  const games = s.G.split(';').filter(Boolean).map(x=>{
+  const allG = s.G.split(';').filter(Boolean);
+  const upcoming = allG.filter(x=>x.endsWith(',U')).map(x=>{const p=x.split(','); return {y,wk:+p[0],ht:teams[+p[1]],at:teams[+p[3]]};});
+  const games = allG.filter(x=>!x.endsWith(',U')).map(x=>{
     const p=x.split(','); const ht=teams[+p[1]], at=teams[+p[3]];
     return {y,wk:+p[0],ht,at,h:ht.m,a:at.m,hs:+p[2],as:+p[4],po:p[5]==='P'};
   });
@@ -275,7 +277,7 @@ YEARS.forEach(y=>{
   games.forEach(g=>{(g.po?poS:regS).push(g.hs,g.as);});
   const twoWk = poS.length>0 && avg(poS) > 1.5*avg(regS);
   games.forEach(g=>{g.multi = g.po && twoWk; GAMES.push(g);});
-  SEASONS[y] = {y,reg:s.reg,po:s.po,teams,list:Object.values(teams),games,complete,twoWk};
+  SEASONS[y] = {y,reg:s.reg,po:s.po,teams,list:Object.values(teams),games,complete,twoWk,upcoming};
 });
 const CUR = YEARS[YEARS.length-1];
 const DONE = YEARS.filter(y=>SEASONS[y].complete);
