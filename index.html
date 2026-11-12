@@ -164,6 +164,20 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:6px;backgroun
 .explore a span{font-size:13px;color:#b8c0d4}
 .explore a:hover{border-left-color:var(--gold)}
 @media (max-width:700px){.hero{grid-template-columns:1fr;justify-items:center}.hero-copy h2{font-size:28px}}
+.riv-wrap{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px}
+.riv-side{display:flex;flex-direction:column;gap:8px}
+.riv{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;background:var(--soft);text-decoration:none;color:var(--ink);border-left:3px solid var(--accent)}
+a.riv:hover{border-left-color:var(--gold)}
+.riv .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.riv b{font-family:var(--display);font-size:18px;font-weight:700}
+.riv-gow{background:var(--navy);color:#fff;border-left-color:var(--gold)}
+.riv-gow .k,.riv-gow .sub{color:#b8c0d4}
+.mtgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
+.mtg{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 4px;border-radius:6px;background:var(--soft);text-decoration:none;color:var(--ink);font-size:12px;border-top:3px solid var(--line)}
+.mtg b{font-family:var(--display);font-size:15px}
+.mtg-a{border-top-color:var(--accent)}
+.mtg-b{border-top-color:var(--navy)}
+@media (max-width:800px){.riv-wrap{grid-template-columns:1fr}}
 .mu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
 .mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:12px}
 .mu-side{display:flex;flex-direction:column;gap:4px}
@@ -1083,6 +1097,66 @@ function vAch(){
   </div>`;
 }
 
+// ----- rivalry spotlight (home) -----
+function rivalrySpotlight(){
+  const pairs=[]; ACTIVE.forEach(a=>ACTIVE.forEach(b=>{ if(a.i<b.i){const h=a.h2h[b.i]; if(h&&h.n) pairs.push({a,b,h});}}));
+  if(!pairs.length) return '';
+  const lead=(p)=>p.h.w>=p.h.l?{x:p.a,y:p.b,w:p.h.w,l:p.h.l}:{x:p.b,y:p.a,w:p.h.l,l:p.h.w};
+  const curStreak=p=>{const L=p.h.list; const last=L[L.length-1]; let n=0; for(let k=L.length-1;k>=0&&L[k].r===last.r;k--)n++; return {n,who:last.r==='W'?p.a:last.r==='L'?p.b:null};};
+  const longest=p=>{let best={n:0},cur=null; p.h.list.forEach(x=>{if(x.r==='T'){cur=null;return;} if(cur&&cur.r===x.r){cur.n++; cur.to=x.y;} else cur={r:x.r,n:1,from:x.y,to:x.y}; if(cur.n>best.n)best={...cur};}); return {...best,who:best.r==='W'?p.a:p.b};};
+  // featured: closest long-running
+  const feat=pairs.filter(p=>p.h.n>=12).sort((x,y)=>Math.abs(x.h.w-x.h.l)-Math.abs(y.h.w-y.h.l)||y.h.n-x.h.n)[0]||pairs[0];
+  const {a,b,h}=feat;
+  const sg=h.list.filter(x=>!x.g.multi);
+  const bigA=sg.filter(x=>x.r==='W').sort((p,q)=>(q.ms-q.os)-(p.ms-p.os))[0], bigB=sg.filter(x=>x.r==='L').sort((p,q)=>(p.ms-p.os)-(q.ms-q.os))[0];
+  const cs=curStreak(feat), ls=longest(feat);
+  const last5=h.list.slice(-6).reverse();
+  const nextMeet=(curS.upcoming||[]).filter(g=>(g.ht.m===a.i&&g.at.m===b.i)||(g.ht.m===b.i&&g.at.m===a.i)).sort((x,y)=>x.wk-y.wk)[0];
+  const chip=x=>{const w=x.r==='W'?a:x.r==='L'?b:null; return `<a class="mtg ${x.r==='W'?'mtg-a':x.r==='L'?'mtg-b':''}" href="#season-${x.y}" title="${x.y} Wk ${x.wk}${x.po?' (playoffs)':''}: ${esc(a.m.short)} ${f2(x.ms)}, ${esc(b.m.short)} ${f2(x.os)}"><b>${w?esc(w.m.short.split(' ')[0]):'Tie'}</b><span>${x.y}${x.po?' PO':''}</span><span class="num">${f1(Math.max(x.ms,x.os))}–${f1(Math.min(x.ms,x.os))}</span></a>`;};
+  const tile=(k,v,s)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div>${s?`<div class="sub">${s}</div>`:''}</div>`;
+  const featHtml=`
+    <div class="vs-head" style="margin:4px 0 6px"><div><div class="nm" style="font-size:22px">${mlink(a.i)}</div><div class="sub">${esc(a.curTeam)}</div></div><div class="big num" style="font-size:52px">${h.w}–${h.l}${h.t?`<span class="sub" style="font-size:18px">–${h.t}</span>`:''}</div><div><div class="nm" style="font-size:22px">${mlink(b.i)}</div><div class="sub">${esc(b.curTeam)}</div></div></div>
+    <p class="note" style="text-align:center;margin:0 0 12px">${h.n} meetings since ${h.list[0].y}${h.w===h.l?', dead even':`, separated by ${Math.abs(h.w-h.l)} game${Math.abs(h.w-h.l)>1?'s':''}`}. The closest long-running rivalry in the league.</p>
+    <div class="tiles">
+      ${tile('Playoff meetings',`${h.pw}-${h.pl}`,h.pw+h.pl?'':'never met in the playoffs')}
+      ${tile('Avg score',`${f1(h.pf/h.n)}–${f1(h.pa/h.n)}`)}
+      ${tile('Current streak',cs.who?`${esc(cs.who.m.short)} ${cs.n}`:'Tied',cs.n>1?`${cs.n} straight`:'won the last one')}
+      ${tile('Longest streak',ls.n?`${esc(ls.who.m.short)} ${ls.n}`:'–',ls.n?`${ls.from}–${ls.to}`:'')}
+      ${bigA?tile(`${esc(a.m.short)} biggest win`,`+${f1(bigA.ms-bigA.os)}`,`${bigA.y} Wk ${bigA.wk}`):''}
+      ${bigB?tile(`${esc(b.m.short)} biggest win`,`+${f1(bigB.os-bigB.ms)}`,`${bigB.y} Wk ${bigB.wk}`):''}
+    </div>
+    <div class="head" style="margin:14px 0 6px"><span class="sub" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700">Last ${last5.length} meetings</span>${nextMeet?`<span class="pill p-live">Next: ${CUR} Week ${nextMeet.wk}</span>`:''}</div>
+    <div class="mtgs">${last5.map(chip).join('')}</div>
+    <div style="text-align:center;margin-top:12px"><a class="chip" href="#versus-${a.i}-${b.i}">Full breakdown</a></div>`;
+  // other rivalries
+  const most=pairs.slice().sort((x,y)=>y.h.n-x.h.n)[0];
+  const lop=pairs.filter(p=>p.h.n>=10).sort((x,y)=>Math.abs(y.h.w-y.h.l)/y.h.n-Math.abs(x.h.w-x.h.l)/x.h.n)[0];
+  const strk=pairs.map(p=>({p,s:curStreak(p)})).filter(x=>x.s.who).sort((x,y)=>y.s.n-x.s.n)[0];
+  const poR=pairs.filter(p=>p.h.pw+p.h.pl>0).sort((x,y)=>(y.h.pw+y.h.pl)-(x.h.pw+x.h.pl)||y.h.n-x.h.n)[0];
+  const fam=ACTIVE.filter(c=>/sarget/i.test(c.name));
+  const famPairs=pairs.filter(p=>fam.includes(p.a)&&fam.includes(p.b));
+  const famTot=fam.map(c=>{let w=0,l=0; fam.forEach(o=>{if(o!==c){const hh=c.h2h[o.i]; if(hh){w+=hh.w;l+=hh.l;}}}); return {c,w,l};}).sort((x,y)=>y.w-x.w);
+  const mini=(title,p,line,sub)=>p?`<a class="riv" href="#versus-${p.a.i}-${p.b.i}"><span class="k">${title}</span><b>${line}</b><span class="sub">${sub}</span></a>`:'';
+  const L=p=>lead(p);
+  const others=[
+    mini('Most played',most,`${esc(L(most).x.m.short)} ${L(most).w}-${L(most).l} ${esc(L(most).y.m.short)}`,`${most.h.n} meetings since ${most.h.list[0].y}`),
+    lop?mini('Most lopsided',lop,`${esc(L(lop).x.m.short)} ${L(lop).w}-${L(lop).l} ${esc(L(lop).y.m.short)}`,`${f0(L(lop).w/lop.h.n*100)}% for one side`):'',
+    strk?mini('Longest active streak',strk.p,`${esc(strk.s.who.m.short)} has won ${strk.s.n} straight`,`vs ${esc((strk.s.who===strk.p.a?strk.p.b:strk.p.a).m.short)}`):'',
+    poR?mini('Biggest playoff rivalry',poR,`${esc(poR.a.m.short)} ${poR.h.pw}-${poR.h.pl} ${esc(poR.b.m.short)}`,`${poR.h.pw+poR.h.pl} playoff meetings`):'',
+    famPairs.length?`<div class="riv"><span class="k">Sargetis family feud</span><b>${famTot.map(x=>`${esc(x.c.m.short)} ${x.w}-${x.l}`).join(' · ')}</b><span class="sub">${famPairs.map(p=>`<a class="mgr" href="#versus-${p.a.i}-${p.b.i}">${esc(p.a.m.short.split(' ')[0])} ${p.h.w}-${p.h.l} ${esc(p.b.m.short.split(' ')[0])}</a>`).join(' · ')}</span></div>`:'',
+  ].join('');
+  // game of the week
+  let gow='';
+  if(!curS.complete&&curS.upcoming&&curS.upcoming.length){
+    const wk=Math.min(...curS.upcoming.map(g=>g.wk));
+    const cand=curS.upcoming.filter(g=>g.wk===wk).map(g=>{const hh=C[g.ht.m].h2h[g.at.m]; return {g,hh,score:hh?hh.n-3*Math.abs(hh.w-hh.l):0};}).sort((x,y)=>y.score-x.score)[0];
+    if(cand&&cand.hh){const g=cand.g, hh=cand.hh, Ls=hh.list[hh.list.length-1];
+      gow=`<a class="riv riv-gow" href="#now"><span class="k">Rivalry game of Week ${wk}</span><b>${esc(M[g.ht.m].short)} vs ${esc(M[g.at.m].short)}</b><span class="sub">${hh.w}-${hh.l}${hh.t?'-'+hh.t:''} all-time · last met ${Ls.y} Wk ${Ls.wk} · ${esc(g.ht.n)} vs ${esc(g.at.n)}</span></a>`;}
+  }
+  return `<div class="card"><div class="head" style="margin-bottom:10px"><h3>Rivalry Spotlight</h3><a class="chip" href="#h2h">Head-to-Head</a></div>
+    <div class="riv-wrap"><div class="riv-feat">${featHtml}</div><div class="riv-side">${gow}${others}</div></div></div>`;
+}
+
 // ----- Home (history front page) -----
 function vHome(){
   const totPts=sum(GAMES.flatMap(g=>[g.hs,g.as]));
@@ -1109,9 +1183,6 @@ function vHome(){
     const top=gs.flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,o:g.a},{m:g.a,t:g.at,s:g.as,o:g.h}]).sort((a,b)=>b.s-a.s)[0];
     const big=gs.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin)[0]; return {y,top,big,po:gs.some(g=>g.po)};}).filter(Boolean).slice(0,8);
   const histHtml=hist.map(h=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><span class="rk" style="color:var(--ink)">${h.y}</span><span>${mlink(h.top.m,M[h.top.m].short)} put up <b class="num">${f2(h.top.s)}</b>${h.po?' <span class="pill p-po">Playoffs</span>':''}<div class="sub">Biggest win: ${esc(M[h.big.win].short)} over ${esc(M[h.big.lose].short)} by ${f2(h.big.margin)}</div></span><a class="sub" href="#season-${h.y}">${h.y} ›</a></div>`).join('');
-  // rivalry spotlight
-  let riv=null; ACTIVE.forEach(a=>ACTIVE.forEach(b=>{ if(a.i<b.i){const h=a.h2h[b.i]; if(h&&h.n>=12){const score=Math.abs(h.w-h.l)*10-h.n; if(!riv||score<riv.score)riv={a,b,h,score};}}}));
-  const rivHtml=riv?`<div class="vs-head" style="margin:6px 0 10px"><div class="nm" style="font-size:20px">${mlink(riv.a.i,riv.a.m.short)}</div><div class="big num" style="font-size:44px">${riv.h.w}–${riv.h.l}</div><div class="nm" style="font-size:20px">${mlink(riv.b.i,riv.b.m.short)}</div></div><p class="note" style="text-align:center;margin:0 0 10px">${riv.h.n} meetings since ${riv.h.list[0].y}${riv.h.w===riv.h.l?', dead even':`, separated by ${Math.abs(riv.h.w-riv.h.l)} game${Math.abs(riv.h.w-riv.h.l)>1?'s':''}`}. Avg score ${f1(riv.h.pf/riv.h.n)}–${f1(riv.h.pa/riv.h.n)}.</p><div style="text-align:center"><a class="chip" href="#versus-${riv.a.i}-${riv.b.i}">Full breakdown</a></div>`:'';
   // classic title games & drought
   const finals=DONE.map(y=>SEASONS[y].final).filter(g=>g&&!g.multi).sort((a,b)=>a.margin-b.margin).slice(0,4);
   const drought=ACTIVE.slice().sort((a,b)=>b.curDrought-a.curDrought||a.titles.length-b.titles.length).slice(0,5);
@@ -1124,8 +1195,8 @@ function vHome(){
     <div class="card"><div class="head" style="margin-bottom:6px"><h3>Week ${wkNow} in BVFFB History</h3><span class="sub">top score each year</span></div><div class="rec-list">${histHtml}</div></div>
   </div>
   <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Record Book</h3><a class="chip" href="#records">All records</a></div><div class="tiles">${watch.map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v num">${t[1]}</div><div class="sub">${esc(String(t[2]))}</div></div>`).join('')}</div></div>
-  <div class="grid3">
-    <div class="card"><h3>Rivalry Spotlight</h3>${rivHtml}</div>
+  ${rivalrySpotlight()}
+  <div class="grid2">
     <div class="card"><h3>Classic Title Games</h3><div class="rec-list">${finals.map(g=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><span class="rk" style="color:var(--ink)">${g.y}</span><span>${mlink(g.win,M[g.win].short)} over ${mlink(g.lose,M[g.lose].short)}<div class="sub num">${f2(g.ws)}–${f2(g.ls)}</div></span><span class="val">${f2(g.margin)}</span></div>`).join('')}</div><p class="note">The closest championship games ever, by margin.</p></div>
     <div class="card"><h3>Title Drought Clock</h3><div class="rec-list">${drought.map(c=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(c.i)}<div class="sub">${c.titles.length?'last title '+c.titles[c.titles.length-1]:'never won · since '+c.years[0]}</div></span><span class="val">${c.curDrought} yrs</span></div>`).join('')}</div></div>
   </div>
