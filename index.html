@@ -815,10 +815,9 @@ function vH2H(){
   const cell=(a,b)=>{ if(a===b) return `<td style="background:var(--soft)"></td>`; const h=rec2(a,b.i,H2H_OPTS.po); if(!h||!h.n) return `<td class="sub">–</td>`;
     const p=(h.w+h.t/2)/h.n; const bg=p>.5?`color-mix(in srgb, var(--good) ${Math.round((p-.5)*120+10)}%, var(--surface))`:p<.5?`color-mix(in srgb, var(--bad) ${Math.round((.5-p)*120+10)}%, var(--surface))`:'var(--soft)';
     return `<td class="cell num" style="background:${bg}" data-vs="${a.i}-${b.i}" title="${esc(a.name)} vs ${esc(b.name)}: ${rec(h.w,h.l,h.t)}">${rec(h.w,h.l,h.t)}</td>`;};
-  return `<div class="head"><div><h2>Head-to-Head</h2><p class="lede">Read across: each row is that manager's record against the column. Green means they own the matchup. Click any cell for the full Versus breakdown.</p></div>
-  <div class="ctrl"><label class="toggle"><input type="checkbox" id="h-act" ${H2H_OPTS.active?'checked':''}> Active managers only</label><label class="toggle"><input type="checkbox" id="h-po" ${H2H_OPTS.po?'checked':''}> Include playoffs</label></div></div>
-  <div class="card tblwrap"><table class="h2h"><thead><tr><th class="rowh"></th>${list.map(b=>`<th class="colh">${esc(b.m.short)}</th>`).join('')}<th class="colh">Total</th></tr></thead><tbody>${list.map(a=>{let w=0,l=0,t=0; list.forEach(b=>{if(a!==b){const h=rec2(a,b.i,H2H_OPTS.po); if(h){w+=h.w;l+=h.l;t+=h.t;}}}); return `<tr><th class="rowh">${mlink(a.i,a.m.short)}</th>${list.map(b=>cell(a,b)).join('')}<td class="num"><b>${rec(w,l,t)}</b></td></tr>`;}).join('')}</tbody></table></div>
-  ${vVersusBody(...defaultPair(),true)}`;
+  return `<div class="head"><div><h2>Head-to-Head</h2><p class="lede">Pick any two managers to see who has beaten who, who scores more and who has gotten luckier. The full rivalry grid is below.</p></div></div>
+  ${vVersusBody(...defaultPair(),true)}
+  <div class="card"><div class="head" style="margin-bottom:12px"><div><h3>Head-to-Head Grid</h3><p class="note" style="margin:4px 0 0">Read across: each row is that manager's record against the column. Green means they own the matchup. Click any cell to load it into Versus above.</p></div><div class="ctrl"><label class="toggle"><input type="checkbox" id="h-act" ${H2H_OPTS.active?'checked':''}> Active managers only</label><label class="toggle"><input type="checkbox" id="h-po" ${H2H_OPTS.po?'checked':''}> Include playoffs</label></div></div><div class="tblwrap"><table class="h2h"><thead><tr><th class="rowh"></th>${list.map(b=>`<th class="colh">${esc(b.m.short)}</th>`).join('')}<th class="colh">Total</th></tr></thead><tbody>${list.map(a=>{let w=0,l=0,t=0; list.forEach(b=>{if(a!==b){const h=rec2(a,b.i,H2H_OPTS.po); if(h){w+=h.w;l+=h.l;t+=h.t;}}}); return `<tr><th class="rowh">${mlink(a.i,a.m.short)}</th>${list.map(b=>cell(a,b)).join('')}<td class="num"><b>${rec(w,l,t)}</b></td></tr>`;}).join('')}</tbody></table></div></div>`;
 }
 function defaultPair(){
   // most-played active rivalry
@@ -1016,7 +1015,7 @@ function wire(){
   const ha=document.getElementById('h-act'), hp=document.getElementById('h-po');
   if(ha) ha.onchange=()=>{H2H_OPTS.active=ha.checked; route();};
   if(hp) hp.onchange=()=>{H2H_OPTS.po=hp.checked; route();};
-  document.querySelectorAll('td[data-vs]').forEach(td=>td.onclick=()=>{location.hash='versus-'+td.dataset.vs;});
+  document.querySelectorAll('td[data-vs]').forEach(td=>td.onclick=()=>{const [x,y]=td.dataset.vs.split('-'); const v=document.getElementById('versus'); if(v){v.outerHTML=vVersusBody(+x,+y,true); wire(); document.getElementById('versus').scrollIntoView({behavior:'smooth'});} else location.hash='versus-'+td.dataset.vs;});
 }
 document.getElementById('tab-now').textContent=CUR+' Season';
 window.addEventListener('hashchange',()=>{route(); window.scrollTo(0,0);});
