@@ -1032,13 +1032,6 @@ function vHome(){
   const drought=ACTIVE.slice().sort((a,b)=>b.curDrought-a.curDrought||a.titles.length-b.titles.length).slice(0,5);
   const explore=[['#standings','All-Time Standings','Every manager since 2011'],['#records','Record Book','Highs, lows, streaks and droughts'],['#franchise','Franchises','Career pages for every manager'],['#h2h','Head-to-Head','Who owns who'],['#achievements','Achievements','Trophies and follies'],['#now',`${CUR} Season`,'Live standings and results']];
   return `
-  <section class="hero">
-    <div class="hero-copy">
-      <h2>${YEARS.length} seasons. ${nChamps} champions. One league.</h2>
-      <p class="lede">Every title, every blowout and every grudge in Bella Vista Fantasy Football since ${YEARS[0]}.</p>
-      <div class="strip">${strip.map(s=>`<div><div class="v num">${s[0]}</div><div class="k">${s[1]}</div></div>`).join('')}</div>
-    </div>
-  </section>
   <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Rafters</h3><a class="chip" href="#champions">All champions</a></div>${rafters()}</div>
   <div class="grid2">
     <div class="card"><div class="head" style="margin-bottom:6px"><h3>Dynasty Leaderboard</h3><a class="chip" href="#ratings">League Ratings</a></div>

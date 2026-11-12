@@ -19,6 +19,7 @@ NAME_FIX = {
     "Alexandros Sargetis": "Alex Sargettis",
     "lefteris sargetis": "Lefteris Sargetis",
     "will gonzales": "Will Gonzales",
+    "Hibbs Sam": "Sam Hibbs",
 }
 # Accounts with no first/last name on file
 ID_FIX = {"{B1CC5652-EA20-431A-BC8E-E5BD2EC5D585}": "Nick Mosbaugh"}
