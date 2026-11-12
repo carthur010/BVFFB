@@ -653,88 +653,178 @@ function vTrends(){
 }
 
 // ----- Record book -----
+const ERAS=[['all','All-time'],['2011-2013','2011–2013'],['2014-2018','2014–2018'],['2019-2022','2019–2022'],['2023-2099','2023–now']];
+let REC_F={type:'all',era:'all',active:false,n:5};
+// running records entering each regular season game
+YEARS.forEach(y=>{const run={}; SEASONS[y].games.filter(g=>!g.po).sort((a,b)=>a.wk-b.wk).forEach(g=>{
+  [g.ht,g.at].forEach(t=>{run[t.id]=run[t.id]||{w:0,l:0,t:0};});
+  g.hRec={...run[g.ht.id]}; g.aRec={...run[g.at.id]};
+  if(g.hs>g.as){run[g.ht.id].w++;run[g.at.id].l++;} else if(g.as>g.hs){run[g.at.id].w++;run[g.ht.id].l++;} else {run[g.ht.id].t++;run[g.at.id].t++;}
+});});
+// weekly averages
+Object.values(weekly).forEach(arr=>{const a=avg(arr.map(e=>e.s)); arr.forEach(e=>{e.wavg=a; e.diff=e.s-a;});});
+// season-level extras per team
+YEARS.forEach(y=>SEASONS[y].list.forEach(t=>{
+  const gs=SEASONS[y].games.filter(g=>!g.po&&(g.ht===t||g.at===t)).sort((a,b)=>a.wk-b.wk);
+  const sc=gs.map(g=>g.ht===t?g.hs:g.as), res=gs.map(g=>{const m=g.ht===t?g.hs:g.as,o=g.ht===t?g.as:g.hs;return m>o?'W':m<o?'L':'T';});
+  let k=0; while(k<res.length&&res[k]==='W')k++; t.startW=k; k=0; while(k<res.length&&res[k]==='L')k++; t.startL=k;
+  t.cv = sc.length>2? sd(sc)/avg(sc)*100 : NaN;
+  t.diffpg = t.games? (t.pf-t.pa)/t.games : NaN;
+  const pg=SEASONS[y].games.filter(g=>g.po&&(g.ht===t||g.at===t)).sort((a,b)=>a.wk-b.wk);
+  t.poPts = pg.length&&!SEASONS[y].twoWk ? sum(pg.map(g=>g.ht===t?g.hs:g.as)) : null; t.poGames=pg.length;
+  t.firstExit = pg.length>0 && (pg[0].lose===t.m);
+}));
+
 function recList(title, items, fmt, sub){
-  return `<div class="card"><h3>${title}</h3>${sub?`<p class="note" style="margin:-6px 0 8px">${sub}</p>`:''}<div class="rec-list">${items.slice(0,5).map((it,k)=>`<div class="rec-row"><span class="rk">${k+1}</span><span>${it.who}<div class="sub">${it.det}</div></span><span class="val">${fmt(it.v)}</span></div>`).join('')}</div></div>`;
+  const rows=items.slice(0,REC_F.n);
+  return `<div class="card"><h3>${title}</h3>${sub?`<p class="note" style="margin:-6px 0 8px">${sub}</p>`:''}<div class="rec-list">${rows.length?rows.map((it,k)=>`<div class="rec-row"><span class="rk">${k+1}</span><span>${it.who}<div class="sub">${it.det}</div></span><span class="val">${fmt(it.v)}</span></div>`).join(''):'<p class="note">Nothing matches these filters.</p>'}</div></div>`;
 }
 function gd(g){return `${g.y} Wk ${g.wk}${g.po?' · playoffs':''}`;}
 function vRecords(sec){
   sec=sec||'games';
   const secs=[['games','Single Game'],['seasons','Season'],['playoffs','Playoffs'],['streaks','Streaks & Droughts'],['career','Career']];
   const nav=`<div class="subtabs">${secs.map(([k,l])=>`<a class="chip ${k===sec?'on':''}" href="#records-${k}">${l}</a>`).join('')}</div>`;
-  const SG=GAMES.filter(g=>!g.multi);
-  const scores=SG.flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,op:g.a,os:g.as,g},{m:g.a,t:g.at,s:g.as,op:g.h,os:g.hs,g}]);
+  const [ea,eb]=REC_F.era==='all'?[0,9999]:REC_F.era.split('-').map(Number);
+  const inEra=y=>y>=ea&&y<=eb, okM=m=>!REC_F.active||C[m].active;
+  const typeOk=g=>REC_F.type==='all'||(REC_F.type==='reg'?!g.po:g.po);
+  const careerSec = sec==='streaks'||sec==='career';
+  const filters=`<div class="card ctrl" style="padding:12px 16px">
+    ${careerSec?'':`<label for="rf-type">Games</label><select id="rf-type"><option value="all" ${REC_F.type==='all'?'selected':''}>Regular season + playoffs</option><option value="reg" ${REC_F.type==='reg'?'selected':''}>Regular season</option><option value="po" ${REC_F.type==='po'?'selected':''}>Playoffs</option></select>
+    <label for="rf-era">Era</label><select id="rf-era">${ERAS.map(([v,l])=>`<option value="${v}" ${REC_F.era===v?'selected':''}>${l}</option>`).join('')}</select>`}
+    <label class="toggle"><input type="checkbox" id="rf-active" ${REC_F.active?'checked':''}> Active managers only</label>
+    <label for="rf-n">Show</label><select id="rf-n"><option value="5" ${REC_F.n===5?'selected':''}>Top 5</option><option value="10" ${REC_F.n===10?'selected':''}>Top 10</option></select>
+    ${careerSec?'<span class="note">Career records cover every season, so the game and era filters don\'t apply here.</span>':''}
+  </div>`;
+  const G0=GAMES.filter(g=>inEra(g.y)&&typeOk(g)), SG=G0.filter(g=>!g.multi);
+  const scores=SG.flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,op:g.a,os:g.as,g},{m:g.a,t:g.at,s:g.as,op:g.h,os:g.hs,g}]).filter(x=>okM(x.m));
+  const W=SG.filter(g=>!g.tie&&okM(g.win));
   const sc=(a,dir,key)=>a.slice().sort((x,y)=>dir*(y[key]-x[key]));
-  const gWho=x=>`${mlink(x.m)}`;
+  const wk=Object.values(weekly).flat().filter(e=>inEra(e.g.y)&&REC_F.type!=='po'&&okM(e.m));
   let body='';
   if(sec==='games'){
+    const upsets=W.filter(g=>!g.po&&g.wk>=4).map(g=>{const wr=g.win===g.h?g.hRec:g.aRec, lr=g.win===g.h?g.aRec:g.hRec; const wp=r=>(r.w+r.t/2)/Math.max(1,r.w+r.l+r.t); return {g,wr,lr,v:wp(lr)-wp(wr)};}).filter(x=>x.v>0).sort((a,b)=>b.v-a.v||b.lr.w-a.lr.w);
+    const badBeats=wk.filter(e=>e.rank===2&&e.s<(e.g.h===e.m?e.g.as:e.g.hs)).sort((a,b)=>b.s-a.s);
+    const weeks={}; wk.forEach(e=>{const k=e.g.y+'-'+e.g.wk; (weeks[k]=weeks[k]||{y:e.g.y,wk:e.g.wk,arr:[]}).arr.push(e.s);});
+    const wl=Object.values(weeks).map(w=>({...w,a:avg(w.arr)}));
     body=`<div class="grid3">
-    ${recList('Highest Score',sc(scores,1,'s').map(x=>({v:x.s,who:gWho(x),det:`${esc(x.t.n)} vs ${esc(M[x.op].short)} · ${gd(x.g)}`})),f2)}
-    ${recList('Lowest Score',sc(scores,-1,'s').map(x=>({v:x.s,who:gWho(x),det:`${esc(x.t.n)} vs ${esc(M[x.op].short)} · ${gd(x.g)}`})),f2)}
-    ${recList('Biggest Blowout',sc(SG.filter(g=>!g.tie),1,'margin').map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${gd(g)}`})),f2)}
-    ${recList('Closest Game',SG.filter(g=>!g.tie).sort((a,b)=>a.margin-b.margin).map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${gd(g)}`})),f2)}
-    ${recList('Highest Scoring Matchup',sc(SG,1,'tot').map(g=>({v:g.tot,who:`${mlink(g.h,M[g.h].short)} vs ${mlink(g.a,M[g.a].short)}`,det:`${f2(g.hs)}-${f2(g.as)} · ${gd(g)}`})),f2)}
-    ${recList('Lowest Scoring Matchup',sc(SG,-1,'tot').map(g=>({v:g.tot,who:`${mlink(g.h,M[g.h].short)} vs ${mlink(g.a,M[g.a].short)}`,det:`${f2(g.hs)}-${f2(g.as)} · ${gd(g)}`})),f2)}
-    ${recList('Highest Score in a Loss',SG.filter(g=>!g.tie).sort((a,b)=>b.ls-a.ls).map(g=>({v:g.ls,who:mlink(g.lose),det:`lost to ${esc(M[g.win].short)} ${f2(g.ws)}-${f2(g.ls)} · ${gd(g)}`})),f2)}
-    ${recList('Lowest Score in a Win',SG.filter(g=>!g.tie).sort((a,b)=>a.ws-b.ws).map(g=>({v:g.ws,who:mlink(g.win),det:`beat ${esc(M[g.lose].short)} ${f2(g.ws)}-${f2(g.ls)} · ${gd(g)}`})),f2)}
+    ${recList('Highest Score',sc(scores,1,'s').map(x=>({v:x.s,who:mlink(x.m),det:`${esc(x.t.n)} vs ${esc(M[x.op].short)} · ${gd(x.g)}`})),f2)}
+    ${recList('Lowest Score',sc(scores,-1,'s').map(x=>({v:x.s,who:mlink(x.m),det:`${esc(x.t.n)} vs ${esc(M[x.op].short)} · ${gd(x.g)}`})),f2)}
+    ${recList('Biggest Blowout',sc(W,1,'margin').map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${gd(g)}`})),f2)}
+    ${recList('Closest Game',W.slice().sort((a,b)=>a.margin-b.margin).map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${gd(g)}`})),f2)}
+    ${recList('Biggest Upset',upsets.map(x=>({v:x,who:mlink(x.g.win),det:`${rec(x.wr.w,x.wr.l,x.wr.t)} team beat ${esc(M[x.g.lose].short)} at ${rec(x.lr.w,x.lr.l,x.lr.t)} · ${gd(x.g)}`})),x=>`${rec(x.wr.w,x.wr.l)} > ${rec(x.lr.w,x.lr.l)}`,'Records entering the game, Week 4 on')}
+    ${recList('Bad Beat',badBeats.map(e=>({v:e.s,who:mlink(e.m),det:`Lost to ${esc(M[e.g.h===e.m?e.g.a:e.g.h].short)}, the only team that outscored them · ${gd(e.g)}`})),f2,'Second-best score of the week, and it ran into the best')}
+    ${recList('Best Week vs League',wk.slice().sort((a,b)=>b.diff-a.diff).map(e=>({v:e.diff,who:mlink(e.m),det:`${f2(e.s)} vs a ${f1(e.wavg)} league average · ${gd(e.g)}`})),v=>sgn(v,1),'Points above that week\'s league average')}
+    ${recList('Worst Week vs League',wk.slice().sort((a,b)=>a.diff-b.diff).map(e=>({v:e.diff,who:mlink(e.m),det:`${f2(e.s)} vs a ${f1(e.wavg)} league average · ${gd(e.g)}`})),v=>sgn(v,1))}
+    ${recList('Highest Score in a Loss',W.slice().sort((a,b)=>b.ls-a.ls).map(g=>({v:g.ls,who:mlink(g.lose),det:`lost to ${esc(M[g.win].short)} ${f2(g.ws)}-${f2(g.ls)} · ${gd(g)}`})).filter(x=>okM(+x.who.match(/franchise-(\d+)/)[1])),f2)}
+    ${recList('Lowest Score in a Win',W.slice().sort((a,b)=>a.ws-b.ws).map(g=>({v:g.ws,who:mlink(g.win),det:`beat ${esc(M[g.lose].short)} ${f2(g.ws)}-${f2(g.ls)} · ${gd(g)}`})),f2)}
+    ${recList('Highest Scoring Week',wl.slice().sort((a,b)=>b.a-a.a).map(w=>({v:w.a,who:`<a class="mgr" href="#season-${w.y}">${w.y} Week ${w.wk}</a>`,det:`${f0(sum(w.arr))} total points across ${w.arr.length} teams`})),f1,'League-wide average team score')}
+    ${recList('Lowest Scoring Week',wl.slice().sort((a,b)=>a.a-b.a).map(w=>({v:w.a,who:`<a class="mgr" href="#season-${w.y}">${w.y} Week ${w.wk}</a>`,det:`${f0(sum(w.arr))} total points across ${w.arr.length} teams`})),f1)}
     </div>`;
   } else if(sec==='seasons'){
-    const TS=DONE.flatMap(y=>SEASONS[y].list);
-    const tw=t=>`${mlink(t.m)}`, td=t=>`${esc(t.n)} · ${t.y} · ${rec(t.w,t.l,t.t)}`;
-    body=`<p class="note">Completed seasons only. Per-game numbers keep 13, 14 and 17-week seasons comparable.</p><div class="grid3">
+    const TS=DONE.filter(inEra).flatMap(y=>SEASONS[y].list).filter(t=>okM(t.m));
+    const tw=t=>mlink(t.m), td=t=>`${esc(t.n)} · ${t.y} · ${rec(t.w,t.l,t.t)}`;
+    const poS=TS.filter(t=>SEASONS[t.y].po>0);
+    const turn=[]; TS.forEach(t=>{const p=C[t.m].teams.find(x=>x.y===t.y-1); if(p&&SEASONS[p.y].complete) turn.push({t,p,v:(t.wp-p.wp)*100});});
+    body=`<p class="note">Completed seasons only. Per-game numbers keep 12, 13, 14 and 17-week seasons comparable.</p><div class="grid3">
     ${recList('Best Record',TS.slice().sort((a,b)=>b.wp-a.wp||b.pf-a.pf).map(t=>({v:t.wp,who:tw(t),det:td(t)})),pct)}
+    ${recList('Worst Record',TS.slice().sort((a,b)=>a.wp-b.wp||a.pf-b.pf).map(t=>({v:t.wp,who:tw(t),det:td(t)})),pct)}
     ${recList('Most Points Per Game',TS.slice().sort((a,b)=>b.ppg-a.ppg).map(t=>({v:t.ppg,who:tw(t),det:td(t)})),f2)}
+    ${recList('Fewest Points Per Game',TS.slice().sort((a,b)=>a.ppg-b.ppg).map(t=>({v:t.ppg,who:tw(t),det:td(t)})),f2)}
     ${recList('Most Points vs League Avg',TS.slice().sort((a,b)=>(b.ppg/SEASONS[b.y].lgPpg)-(a.ppg/SEASONS[a.y].lgPpg)).map(t=>({v:(t.ppg/SEASONS[t.y].lgPpg-1)*100,who:tw(t),det:td(t)})),v=>sgn(v)+'%')}
-    ${recList('Best All-Play',TS.slice().sort((a,b)=>b.apPct-a.apPct).map(t=>({v:t.apPct,who:tw(t),det:td(t)})),pct)}
+    ${recList('Best Point Differential',TS.slice().sort((a,b)=>b.diffpg-a.diffpg).map(t=>({v:t.diffpg,who:tw(t),det:td(t)})),v=>sgn(v,1),'Per game')}
+    ${recList('Best Team to Miss the Playoffs',poS.filter(t=>!t.made).sort((a,b)=>b.wp-a.wp||b.pf-a.pf).map(t=>({v:t.wp,who:tw(t),det:td(t)+` · ${f0(t.pf)} pts`})),pct)}
+    ${recList('Worst Team to Make the Playoffs',poS.filter(t=>t.made).sort((a,b)=>a.wp-b.wp||a.pf-b.pf).map(t=>({v:t.wp,who:tw(t),det:td(t)+` · ${t.seed} seed, finished ${ord(t.f)}`})),pct)}
+    ${recList('Worst Record by a Champion',TS.filter(t=>t.f===1).sort((a,b)=>a.wp-b.wp).map(t=>({v:t.wp,who:tw(t),det:td(t)+(SEASONS[t.y].po?` · ${t.seed} seed`:'')})),pct)}
+    ${recList('Best Start',TS.filter(t=>t.startW>0).sort((a,b)=>b.startW-a.startW||b.wp-a.wp).map(t=>({v:t.startW,who:tw(t),det:td(t)+' final'})),v=>v+'-0')}
+    ${recList('Worst Start',TS.filter(t=>t.startL>0).sort((a,b)=>b.startL-a.startL||a.wp-b.wp).map(t=>({v:t.startL,who:tw(t),det:td(t)+' final'})),v=>'0-'+v)}
+    ${recList('Most Weekly High Scores',TS.slice().sort((a,b)=>b.ap.hi-a.ap.hi||b.pf-a.pf).map(t=>({v:t.ap.hi,who:tw(t),det:td(t)})),v=>v+' wks','In one season')}
+    ${recList('Biggest Turnaround',turn.slice().sort((a,b)=>b.v-a.v).map(x=>({v:x.v,who:mlink(x.t.m),det:`${rec(x.p.w,x.p.l,x.p.t)} in ${x.p.y} to ${rec(x.t.w,x.t.l,x.t.t)} in ${x.t.y}`})),v=>sgn(v,0)+' pts','Change in win %, year over year')}
+    ${recList('Biggest Collapse',turn.slice().sort((a,b)=>a.v-b.v).map(x=>({v:x.v,who:mlink(x.t.m),det:`${rec(x.p.w,x.p.l,x.p.t)} in ${x.p.y} to ${rec(x.t.w,x.t.l,x.t.t)} in ${x.t.y}`})),v=>sgn(v,0)+' pts')}
+    ${recList('Most Consistent',TS.filter(t=>!isNaN(t.cv)).sort((a,b)=>a.cv-b.cv).map(t=>({v:t.cv,who:tw(t),det:td(t)+` · ${f1(t.ppg)} per game`})),v=>f1(v)+'%','Lowest week-to-week swing (coefficient of variation)')}
+    ${recList('Most Boom or Bust',TS.filter(t=>!isNaN(t.cv)).sort((a,b)=>b.cv-a.cv).map(t=>({v:t.cv,who:tw(t),det:td(t)+` · ${f1(t.ppg)} per game`})),v=>f1(v)+'%')}
     ${recList('Luckiest Season',TS.slice().sort((a,b)=>b.luck-a.luck).map(t=>({v:t.luck,who:tw(t),det:td(t)+` · all-play ${pct(t.apPct)}`})),v=>sgn(v)+' W')}
     ${recList('Unluckiest Season',TS.slice().sort((a,b)=>a.luck-b.luck).map(t=>({v:t.luck,who:tw(t),det:td(t)+` · all-play ${pct(t.apPct)}`})),v=>sgn(v)+' W')}
-    ${recList('Toughest Schedule',TS.slice().sort((a,b)=>b.papg-a.papg).map(t=>({v:t.papg,who:tw(t),det:td(t)})),f2,'Points allowed per game')}
-    ${recList('Worst Record',TS.slice().sort((a,b)=>a.wp-b.wp||a.pf-b.pf).map(t=>({v:t.wp,who:tw(t),det:td(t)})),pct)}
-    ${recList('Fewest Points Per Game',TS.slice().sort((a,b)=>a.ppg-b.ppg).map(t=>({v:t.ppg,who:tw(t),det:td(t)})),f2)}
     </div>`;
   } else if(sec==='playoffs'){
-    const P=GAMES.filter(g=>g.po);
-    const PS=P.filter(g=>!g.multi).flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,op:g.a,g},{m:g.a,t:g.at,s:g.as,op:g.h,g}]);
-    const finals=DONE.map(y=>SEASONS[y].final).filter(Boolean);
-    const withPo=C.filter(c=>c.pow+c.pol>0);
+    const PY=DONE.filter(y=>inEra(y)&&SEASONS[y].po>0);
+    const P=GAMES.filter(g=>g.po&&inEra(g.y));
+    const PS=P.filter(g=>!g.multi).flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,op:g.a,g},{m:g.a,t:g.at,s:g.as,op:g.h,g}]).filter(x=>okM(x.m));
+    const finals=PY.map(y=>SEASONS[y].final).filter(g=>g&&okM(g.win));
+    const PT=PY.flatMap(y=>SEASONS[y].list).filter(t=>okM(t.m));
+    const tally=k=>{const o={}; PT.forEach(t=>{if(k(t)){(o[t.m]=o[t.m]||[]).push(t.y);}}); return Object.entries(o).map(([m,ys])=>({m:+m,ys})).sort((a,b)=>b.ys.length-a.ys.length);};
+    const pw={}; P.forEach(g=>{[[g.h,g.hs>g.as],[g.a,g.as>g.hs]].forEach(([m,w])=>{if(!okM(m))return; pw[m]=pw[m]||{w:0,l:0}; w?pw[m].w++:pw[m].l++;});});
+    const pwl=Object.entries(pw).map(([m,r])=>({m:+m,...r,p:r.w/(r.w+r.l)}));
+    const ups=P.filter(g=>!g.tie&&g.wt.seed>g.lt.seed&&okM(g.win)).sort((a,b)=>(b.wt.seed-b.lt.seed)-(a.wt.seed-a.lt.seed)||b.y-a.y);
+    const seedRows=[1,2,3,4,5,6].map(s=>{const ts=PY.flatMap(y=>SEASONS[y].list.filter(t=>t.seed===s&&t.made)); const gs=P.filter(g=>g.ht.seed===s||g.at.seed===s); let w=0,l=0; gs.forEach(g=>{if(g.ht.seed===s){g.hs>g.as?w++:l++;} if(g.at.seed===s){g.as>g.hs?w++:l++;}}); return {s,n:ts.length,t:ts.filter(t=>t.f===1).length,f:ts.filter(t=>t.f<=2).length,w,l};}).filter(r=>r.n);
     body=`<div class="grid3">
-    ${recList('Most Championships',C.slice().sort((a,b)=>b.titles.length-a.titles.length||b.finals.length-a.finals.length).map(c=>({v:c.titles.length,who:mlink(c.i),det:c.titles.join(', ')||'–'})),v=>v)}
-    ${recList('Most Title Game Trips',C.slice().sort((a,b)=>b.finals.length-a.finals.length||b.titles.length-a.titles.length).map(c=>({v:c.finals.length,who:mlink(c.i),det:`${c.titles.length} won · ${c.rus.length} lost`})),v=>v)}
-    ${recList('Most Playoff Trips',C.slice().sort((a,b)=>b.poApps.length-a.poApps.length).map(c=>({v:c.poApps.length,who:mlink(c.i),det:`in ${c.eligible} playoff seasons`})),v=>v)}
-    ${recList('Best Playoff Win %',withPo.filter(c=>c.pow+c.pol>=4).sort((a,b)=>b.pow/(b.pow+b.pol)-a.pow/(a.pow+a.pol)).map(c=>({v:c.pow/(c.pow+c.pol),who:mlink(c.i),det:`${c.pow}-${c.pol} in playoff games`})),pct,'Minimum 4 playoff games')}
+    ${recList('Most Championships',tally(t=>t.f===1).map(x=>({v:x.ys.length,who:mlink(x.m),det:x.ys.join(', ')})),v=>v)}
+    ${recList('Most Title Game Trips',tally(t=>t.f<=2).map(x=>({v:x.ys.length,who:mlink(x.m),det:x.ys.join(', ')})),v=>v)}
+    ${recList('Most Playoff Trips',tally(t=>t.made).map(x=>({v:x.ys.length,who:mlink(x.m),det:`${x.ys[0]}–${x.ys[x.ys.length-1]}`})),v=>v)}
+    ${recList('Best Playoff Win %',pwl.filter(r=>r.w+r.l>=4).sort((a,b)=>b.p-a.p||b.w-a.w).map(r=>({v:r.p,who:mlink(r.m),det:`${r.w}-${r.l} in playoff games`})),pct,'Minimum 4 playoff games')}
+    ${recList('Most Playoff Losses',pwl.slice().sort((a,b)=>b.l-a.l).map(r=>({v:r.l,who:mlink(r.m),det:`${r.w}-${r.l} in playoff games`})),v=>v)}
+    ${recList('Most First-Round Exits',tally(t=>t.made&&t.firstExit).map(x=>({v:x.ys.length,who:mlink(x.m),det:x.ys.join(', ')})),v=>v,'Lost the first playoff game they played')}
     ${recList('Highest Playoff Score',PS.sort((a,b)=>b.s-a.s).map(x=>({v:x.s,who:mlink(x.m),det:`${esc(x.t.n)} vs ${esc(M[x.op].short)} · ${x.g.y} Wk ${x.g.wk}`})),f2,'Single-week playoff games')}
-    ${recList('Biggest Title Game Win',finals.slice().sort((a,b)=>b.margin-a.margin).map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${g.y}`})),f2)}
-    ${recList('Closest Title Game',finals.slice().sort((a,b)=>a.margin-b.margin).map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${g.y}`})),f2)}
-    ${recList('Most Playoff Losses',withPo.slice().sort((a,b)=>b.pol-a.pol).map(c=>({v:c.pol,who:mlink(c.i),det:`${c.pow}-${c.pol} all time`})),v=>v,'The heartbreak list')}
-    ${recList('Most #1 Seeds',C.slice().sort((a,b)=>b.topSeeds.length-a.topSeeds.length).map(c=>({v:c.topSeeds.length,who:mlink(c.i),det:c.topSeeds.join(', ')||'–'})),v=>v)}
-    </div>`;
+    ${recList('Most Points in a Playoff Run',PT.filter(t=>t.poPts!=null).sort((a,b)=>b.poPts-a.poPts).map(t=>({v:t.poPts,who:mlink(t.m),det:`${esc(t.n)} · ${t.y} · ${t.poGames} games · finished ${ord(t.f)}`})),f2,'Seasons with single-week playoff games')}
+    ${recList('Biggest Playoff Upset',ups.map(g=>({v:g.wt.seed-g.lt.seed,who:mlink(g.win),det:`${g.wt.seed} seed over ${g.lt.seed} seed ${esc(M[g.lose].short)}, ${f2(g.ws)}-${f2(g.ls)} · ${g.y} Wk ${g.wk}`})),v=>v+' seeds')}
+    ${recList('Biggest Title Game Win',finals.slice().sort((a,b)=>b.margin-a.margin).map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${g.y}${g.multi?' · two-week final':''}`})),f2)}
+    ${recList('Closest Title Game',finals.slice().sort((a,b)=>a.margin-b.margin).map(g=>({v:g.margin,who:mlink(g.win),det:`${f2(g.ws)}-${f2(g.ls)} over ${esc(M[g.lose].short)} · ${g.y}${g.multi?' · two-week final':''}`})),f2)}
+    ${recList('Most #1 Seeds',tally(t=>t.seed===1).map(x=>({v:x.ys.length,who:mlink(x.m),det:x.ys.join(', ')})),v=>v)}
+    </div>
+    <div class="card"><h3>Playoff Record by Seed</h3><p class="note" style="margin:-6px 0 8px">How each seed has fared${REC_F.era==='all'?' since the playoff era began':' in this era'}. Byes count as an appearance, not a win.</p>
+    ${table('t-seed',[{k:'s',label:'Seed',r:1,asc:1},{k:'n',label:'Appearances',r:1},{k:'t',label:'Titles',r:1,f:r=>`<b>${r.t}</b>`},{k:'f',label:'Title Games',r:1},{k:'tp',label:'Title %',r:1,f:r=>pct(r.t/r.n),sv:r=>r.t/r.n},{k:'wl',label:'Playoff W-L',r:1,f:r=>rec(r.w,r.l),sv:r=>r.w/(r.w+r.l||1)}],seedRows,'s','asc')}</div>`;
   } else if(sec==='streaks'){
+    const CC=C.filter(c=>okM(c.i));
     const sDet=s=>s.from?`${s.from.y} Wk ${s.from.wk} to ${s.to.y} Wk ${s.to.wk}`:'–';
-    const active=C.filter(c=>c.active);
+    const run=(arr,ok)=>{let best={n:0},cur=null; arr.forEach(x=>{ if(ok(x)){cur=cur?{...cur,n:cur.n+1,to:x}:{n:1,from:x,to:x}; if(cur.n>best.n)best={...cur};} else cur=null;}); return best;};
+    const s100=CC.map(c=>({c,s:run(c.games.filter(x=>!x.g.multi),x=>x.ms>=100)}));
+    const seasonRun=(c,ok)=>{let best={n:0},cur=null,prev=null; c.teams.filter(t=>SEASONS[t.y].complete).forEach(t=>{ if(prev!=null&&t.y!==prev+1)cur=null; if(ok(t)){cur=cur?{...cur,n:cur.n+1,to:t.y}:{n:1,from:t.y,to:t.y}; if(cur.n>best.n)best={...cur};} else cur=null; prev=t.y;}); return best;};
+    const vsRun=[]; CC.forEach(c=>Object.entries(c.h2h).forEach(([o,h])=>{const s=run(h.list,x=>x.r==='W'); if(s.n)vsRun.push({c,o:+o,s});}));
+    const active=CC.filter(c=>c.active);
     body=`<p class="note">Game streaks include playoffs and carry across seasons. Playoff streaks skip 2012, which had no playoff.</p><div class="grid3">
-    ${recList('Longest Win Streak',C.slice().sort((a,b)=>b.winStreak.n-a.winStreak.n).map(c=>({v:c.winStreak.n,who:mlink(c.i),det:sDet(c.winStreak)})),v=>v+' W')}
-    ${recList('Longest Losing Streak',C.slice().sort((a,b)=>b.loseStreak.n-a.loseStreak.n).map(c=>({v:c.loseStreak.n,who:mlink(c.i),det:sDet(c.loseStreak)})),v=>v+' L')}
-    ${recList('Longest Playoff Streak',C.slice().sort((a,b)=>b.poStreak.n-a.poStreak.n).map(c=>({v:c.poStreak.n,who:mlink(c.i),det:c.poStreak.n?`${c.poStreak.from}–${c.poStreak.to}`:'–'})),v=>v+' yrs')}
-    ${recList('Longest Playoff Drought',C.slice().sort((a,b)=>b.poDrought.n-a.poDrought.n).map(c=>({v:c.poDrought.n,who:mlink(c.i),det:c.poDrought.n?`${c.poDrought.from}–${c.poDrought.to}`:'–'})),v=>v+' yrs')}
-    ${recList('Longest Title Drought',C.slice().sort((a,b)=>b.titleDrought.n-a.titleDrought.n).map(c=>({v:c.titleDrought.n,who:mlink(c.i),det:`${c.titleDrought.from}–${c.titleDrought.to}${c.titles.length?'':' · never won'}`})),v=>v+' yrs')}
+    ${recList('Longest Win Streak',CC.slice().sort((a,b)=>b.winStreak.n-a.winStreak.n).map(c=>({v:c.winStreak.n,who:mlink(c.i),det:sDet(c.winStreak)})),v=>v+' W')}
+    ${recList('Longest Losing Streak',CC.slice().sort((a,b)=>b.loseStreak.n-a.loseStreak.n).map(c=>({v:c.loseStreak.n,who:mlink(c.i),det:sDet(c.loseStreak)})),v=>v+' L')}
+    ${recList('Win Streak vs One Opponent',vsRun.sort((a,b)=>b.s.n-a.s.n).map(x=>({v:x.s.n,who:`${mlink(x.c.i)} <span class="sub">over</span> ${mlink(x.o,M[x.o].short)}`,det:sDet(x.s)})),v=>v+' W')}
+    ${recList('Consecutive 100-Point Games',s100.sort((a,b)=>b.s.n-a.s.n).map(x=>({v:x.s.n,who:mlink(x.c.i),det:sDet(x.s)})),v=>v+' gms')}
+    ${recList('Consecutive Winning Seasons',CC.map(c=>({c,s:seasonRun(c,t=>t.wp>.5)})).sort((a,b)=>b.s.n-a.s.n).map(x=>({v:x.s.n,who:mlink(x.c.i),det:x.s.n?`${x.s.from}–${x.s.to}`:'–'})),v=>v+' yrs')}
+    ${recList('Consecutive Losing Seasons',CC.map(c=>({c,s:seasonRun(c,t=>t.wp<.5)})).sort((a,b)=>b.s.n-a.s.n).map(x=>({v:x.s.n,who:mlink(x.c.i),det:x.s.n?`${x.s.from}–${x.s.to}`:'–'})),v=>v+' yrs')}
+    ${recList('Longest Playoff Streak',CC.slice().sort((a,b)=>b.poStreak.n-a.poStreak.n).map(c=>({v:c.poStreak.n,who:mlink(c.i),det:c.poStreak.n?`${c.poStreak.from}–${c.poStreak.to}`:'–'})),v=>v+' yrs')}
+    ${recList('Longest Playoff Drought',CC.slice().sort((a,b)=>b.poDrought.n-a.poDrought.n).map(c=>({v:c.poDrought.n,who:mlink(c.i),det:c.poDrought.n?`${c.poDrought.from}–${c.poDrought.to}`:'–'})),v=>v+' yrs')}
+    ${recList('Longest Title Drought',CC.slice().sort((a,b)=>b.titleDrought.n-a.titleDrought.n).map(c=>({v:c.titleDrought.n,who:mlink(c.i),det:`${c.titleDrought.from}–${c.titleDrought.to}${c.titles.length?'':' · never won'}`})),v=>v+' yrs')}
     ${recList('Current Title Drought',active.slice().sort((a,b)=>b.curDrought-a.curDrought).map(c=>({v:c.curDrought,who:mlink(c.i),det:c.titles.length?`last title ${c.titles[c.titles.length-1]}`:`never won, since ${c.years[0]}`})),v=>v+' yrs','Active managers')}
-    ${recList('Hottest Right Now',active.filter(c=>c.curStreak[0]==='W').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).map(c=>({v:c.curStreak,who:mlink(c.i),det:esc(c.curTeam)})),v=>v,'Active win streaks')}
-    ${recList('Coldest Right Now',active.filter(c=>c.curStreak[0]==='L').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).map(c=>({v:c.curStreak,who:mlink(c.i),det:esc(c.curTeam)})),v=>v,'Active losing streaks')}
+    ${recList('Hottest Right Now',active.filter(c=>c.curStreak&&c.curStreak[0]==='W').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).map(c=>({v:c.curStreak,who:mlink(c.i),det:esc(c.curTeam)})),v=>v,'Active win streaks')}
+    ${recList('Coldest Right Now',active.filter(c=>c.curStreak&&c.curStreak[0]==='L').sort((a,b)=>parseInt(b.curStreak.slice(1))-parseInt(a.curStreak.slice(1))).map(c=>({v:c.curStreak,who:mlink(c.i),det:esc(c.curTeam)})),v=>v,'Active losing streaks')}
     </div>`;
   } else {
-    const q=C.filter(c=>c.seasons>=3);
+    const CC=C.filter(c=>okM(c.i)), q=CC.filter(c=>c.seasons>=3);
+    CC.forEach(c=>{
+      const cl=c.games.filter(x=>!x.g.multi&&x.r!=='T'&&Math.abs(x.ms-x.os)<10); c.clW=cl.filter(x=>x.r==='W').length; c.clL=cl.length-c.clW;
+      const vw=c.games.filter(x=>!x.po&&SEASONS[x.y].complete&&x.ot.wp>.5&&x.r!=='T'); c.vwW=vw.filter(x=>x.r==='W').length; c.vwL=vw.length-c.vwW;
+      c.lasts=(c.badges.toilet||[]).length; c.tens=c.teams.filter(t=>SEASONS[t.y].complete&&t.w>=10).length;
+    });
+    const MS=[['wins',c=>c.w,[100,150],'career wins',v=>v],['pts',c=>c.pf,[15000,20000,25000],'career points',f0],['po',c=>c.poApps.length,[5,10],'playoff trips',v=>v],['hi',c=>c.hiWeeks,[25],'weekly high scores',v=>v]];
+    const msHtml=MS.map(([k,fn,levels,label,fm])=>{
+      const top=levels[levels.length-1];
+      return levels.map(L=>{const club=C.filter(c=>fn(c)>=L).sort((a,b)=>fn(b)-fn(a)); const next=C.filter(c=>c.active&&fn(c)<L).sort((a,b)=>fn(b)-fn(a)).slice(0,2);
+        return `<div class="rec-row" style="grid-template-columns:1fr auto"><span><b>${fm(L)} ${label}</b><div class="sub">${club.length?club.map(c=>mlink(c.i,c.m.short)).join(', '):'Nobody yet'}</div>${next.length?`<div class="sub">On the verge: ${next.map(c=>`${esc(c.m.short)} (needs ${fm(L-fn(c))})`).join(', ')}</div>`:''}</span><span class="val">${club.length}</span></div>`;}).join('');}).join('');
     body=`<div class="grid3">
-    ${recList('Most Wins',C.slice().sort((a,b)=>b.w-a.w).map(c=>({v:c.w,who:mlink(c.i),det:`${rec(c.w,c.l,c.t)} in ${c.seasons} seasons`})),v=>v)}
-    ${recList('Most Points',C.slice().sort((a,b)=>b.pf-a.pf).map(c=>({v:c.pf,who:mlink(c.i),det:`${f1(c.ppg)} per game`})),f0)}
+    ${recList('Most Wins',CC.slice().sort((a,b)=>b.w-a.w).map(c=>({v:c.w,who:mlink(c.i),det:`${rec(c.w,c.l,c.t)} in ${c.seasons} seasons`})),v=>v)}
+    ${recList('Most Points',CC.slice().sort((a,b)=>b.pf-a.pf).map(c=>({v:c.pf,who:mlink(c.i),det:`${f1(c.ppg)} per game`})),f0)}
     ${recList('Best Win %',q.slice().sort((a,b)=>b.wp-a.wp).map(c=>({v:c.wp,who:mlink(c.i),det:rec(c.w,c.l,c.t)})),pct,'Minimum 3 seasons')}
-    ${recList('Best Points Per Game vs Avg',q.slice().sort((a,b)=>b.relPpg-a.relPpg).map(c=>({v:c.relPpg,who:mlink(c.i),det:`${f1(c.ppg)} per game`})),v=>sgn(v)+'%','Minimum 3 seasons')}
-    ${recList('Most Weekly High Scores',C.slice().sort((a,b)=>b.hiWeeks-a.hiWeeks).map(c=>({v:c.hiWeeks,who:mlink(c.i),det:`in ${c.seasons} seasons`})),v=>v)}
-    ${recList('Most 150-Point Games',C.slice().sort((a,b)=>b.g150-a.g150).map(c=>({v:c.g150,who:mlink(c.i),det:`${c.gp} regular season games`})),v=>v)}
+    ${recList('Best Scoring vs League Avg',q.slice().sort((a,b)=>b.relPpg-a.relPpg).map(c=>({v:c.relPpg,who:mlink(c.i),det:`${f1(c.ppg)} per game`})),v=>sgn(v)+'%','Minimum 3 seasons')}
+    ${recList('Clutch Record',CC.filter(c=>c.clW+c.clL>=15).sort((a,b)=>b.clW/(b.clW+b.clL)-a.clW/(a.clW+a.clL)).map(c=>({v:c.clW/(c.clW+c.clL),who:mlink(c.i),det:`${c.clW}-${c.clL} in games decided by under 10`})),pct,'Minimum 15 close games')}
+    ${recList('Best vs Winning Teams',CC.filter(c=>c.vwW+c.vwL>=20).sort((a,b)=>b.vwW/(b.vwW+b.vwL)-a.vwW/(a.vwW+a.vwL)).map(c=>({v:c.vwW/(c.vwW+c.vwL),who:mlink(c.i),det:`${c.vwW}-${c.vwL} against teams that finished over .500`})),pct,'Regular season, minimum 20 games')}
+    ${recList('Most 10-Win Seasons',CC.filter(c=>c.tens).sort((a,b)=>b.tens-a.tens).map(c=>({v:c.tens,who:mlink(c.i),det:c.teams.filter(t=>SEASONS[t.y].complete&&t.w>=10).map(t=>t.y).join(', ')})),v=>v)}
+    ${recList('Most Last-Place Finishes',CC.filter(c=>c.lasts).sort((a,b)=>b.lasts-a.lasts).map(c=>({v:c.lasts,who:mlink(c.i),det:(c.badges.toilet||[]).join(', ')})),v=>v)}
+    ${recList('Toughest Career Schedule',q.slice().sort((a,b)=>b.papg-a.papg).map(c=>({v:c.papg,who:mlink(c.i),det:`${f0(c.pa)} points allowed`})),f2,'Points allowed per game, minimum 3 seasons')}
+    ${recList('Most Weekly High Scores',CC.slice().sort((a,b)=>b.hiWeeks-a.hiWeeks).map(c=>({v:c.hiWeeks,who:mlink(c.i),det:`in ${c.seasons} seasons`})),v=>v)}
+    ${recList('Most 150-Point Games',CC.slice().sort((a,b)=>b.g150-a.g150).map(c=>({v:c.g150,who:mlink(c.i),det:`${c.gp} regular season games`})),v=>v)}
     ${recList('Luckiest Career',q.slice().sort((a,b)=>b.luck-a.luck).map(c=>({v:c.luck,who:mlink(c.i),det:`all-play ${pct(c.apPct)} vs actual ${pct(c.wp)}`})),v=>sgn(v)+' W')}
     ${recList('Unluckiest Career',q.slice().sort((a,b)=>a.luck-b.luck).map(c=>({v:c.luck,who:mlink(c.i),det:`all-play ${pct(c.apPct)} vs actual ${pct(c.wp)}`})),v=>sgn(v)+' W')}
-    ${recList('Most Weekly Low Scores',C.slice().sort((a,b)=>b.loWeeks-a.loWeeks).map(c=>({v:c.loWeeks,who:mlink(c.i),det:`in ${c.seasons} seasons`})),v=>v)}
-    </div>`;
+    ${recList('Most Weekly Low Scores',CC.slice().sort((a,b)=>b.loWeeks-a.loWeeks).map(c=>({v:c.loWeeks,who:mlink(c.i),det:`in ${c.seasons} seasons`})),v=>v)}
+    </div>
+    <div class="card"><h3>Milestones</h3><p class="note" style="margin:-6px 0 8px">Every club, who's in it, and which active managers are closest to joining.</p><div class="rec-list" style="columns:2 360px;column-gap:28px;display:block">${msHtml}</div></div>`;
   }
-  return `<div class="head"><div><h2>Record Book</h2><p class="lede">The marks everyone is chasing, and a few nobody wants. Two-week playoff totals from 2011, 2013 and 2014 are left out of single-game records so they don't bury everything else.</p></div></div>${nav}${body}`;
+  return `<div class="head"><div><h2>Record Book</h2><p class="lede">The marks everyone is chasing, and a few nobody wants. Two-week playoff totals from 2011, 2013 and 2014 are left out of single-game records so they don't bury everything else.</p></div></div>${nav}${filters}${body}`;
 }
 
 // ----- Franchise -----
@@ -1011,6 +1101,8 @@ function wire(){
   const fs=document.getElementById('fsel'); if(fs) fs.onchange=()=>{location.hash='franchise-'+fs.value;};
   const va=document.getElementById('vs-a'), vb=document.getElementById('vs-b');
   if(va&&vb){ const go=()=>{ if(location.hash.startsWith('#versus')) location.hash=`versus-${va.value}-${vb.value}`; else { document.getElementById('versus').outerHTML=vVersusBody(+va.value,+vb.value,true); wire(); } }; va.onchange=go; vb.onchange=go; }
+  [['rf-type','type'],['rf-era','era'],['rf-n','n']].forEach(([id,k])=>{const el=document.getElementById(id); if(el) el.onchange=()=>{REC_F[k]=k==='n'?+el.value:el.value; const y=window.scrollY; route(); window.scrollTo(0,y);};});
+  const ra=document.getElementById('rf-active'); if(ra) ra.onchange=()=>{REC_F.active=ra.checked; const y=window.scrollY; route(); window.scrollTo(0,y);};
   const sm=document.getElementById('st-more'); if(sm) sm.onchange=()=>{STAND_MORE=sm.checked; route();};
   const ha=document.getElementById('h-act'), hp=document.getElementById('h-po');
   if(ha) ha.onchange=()=>{H2H_OPTS.active=ha.checked; route();};
