@@ -601,7 +601,7 @@ function historyNav(on){
   return `<div class="subtabs">${items.map(([h,l])=>`<a class="chip ${on&&(on===h||(h.startsWith('season')&&on.startsWith('season')))?'on':''}" href="#${h}">${l}</a>`).join('')}</div>`;
 }
 function rafters(wrap){
-  return `<div class="rafters${wrap?' rafters-wrap':''}">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}" title="${esc(`${y}: ${M[t.m].name}, ${t.n}. ${rec(t.w,t.l,t.t)}${SEASONS[y].po?`, ${ord(t.seed)} seed`:''}.${SEASONS[y].final?` Beat ${M[SEASONS[y].final.lose].name} ${f2(SEASONS[y].final.ws)}-${f2(SEASONS[y].final.ls)} in the title game.`:''}`)}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span><span class="bdet">${rec(t.w,t.l,t.t)}${SEASONS[y].po?` · ${t.seed} seed`:''}</span>${SEASONS[y].final?`<span class="bdet">beat ${esc(M[SEASONS[y].final.lose].short)} ${f1(SEASONS[y].final.ws)}–${f1(SEASONS[y].final.ls)}</span>`:''}</a>`;}).join('')}</div>`;
+  return `<div class="rafters${wrap?' rafters-wrap':''}">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
 }
 
 let STAND_MORE=false;
