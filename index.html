@@ -89,6 +89,8 @@ tbody tr:hover{background:var(--soft)}
 
 /* rafters */
 .rafters{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.rafters-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px 10px;overflow:visible}
+.rafters-wrap .banner{flex:none;width:auto}
 .banner{flex:0 0 140px;background:var(--navy);color:#fff;padding:14px 10px 26px;text-align:center;clip-path:polygon(0 0,100% 0,100% 100%,50% 88%,0 100%);border-top:4px solid var(--accent);text-decoration:none;display:flex;flex-direction:column;gap:4px}
 .banner .yr{font-family:var(--display);font-size:30px;font-weight:800;color:var(--gold);line-height:1}
 .banner .who{font-family:var(--display);font-weight:700;font-size:17px;text-transform:uppercase;line-height:1.05}
@@ -571,8 +573,8 @@ function historyNav(on){
   const items=[['standings','All-Time Standings'],['champions','The Champions'],['ratings','League Ratings'],['season-'+(on&&on.startsWith('season')?on.split('-')[1]:CUR),'Season Archive'],['trends','League Trends']];
   return `<div class="subtabs">${items.map(([h,l])=>`<a class="chip ${on&&(on===h||(h.startsWith('season')&&on.startsWith('season')))?'on':''}" href="#${h}">${l}</a>`).join('')}</div>`;
 }
-function rafters(){
-  return `<div class="rafters">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
+function rafters(wrap){
+  return `<div class="rafters${wrap?' rafters-wrap':''}">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}"><span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
 }
 
 let STAND_MORE=false;
@@ -1191,7 +1193,7 @@ function vHome(){
   const drought=ACTIVE.slice().sort((a,b)=>b.curDrought-a.curDrought||a.titles.length-b.titles.length).slice(0,5);
   const explore=[['#standings','All-Time Standings','Every manager since 2011'],['#records','Record Book','Highs, lows, streaks and droughts'],['#franchise','Franchises','Career pages for every manager'],['#h2h','Head-to-Head','Who owns who'],['#achievements','Achievements','Trophies and follies'],['#now',`${CUR} Season`,'Live standings and results']];
   return `
-  <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Rafters</h3><a class="chip" href="#champions">All champions</a></div>${rafters()}</div>
+  <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Rafters</h3><a class="chip" href="#champions">All champions</a></div>${rafters(true)}</div>
   <div class="grid2">
     <div class="card"><div class="head" style="margin-bottom:6px"><h3>Dynasty Leaderboard</h3><a class="chip" href="#ratings">League Ratings</a></div>
       <div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Manager</th><th class="r">Titles</th><th class="r">Finals</th><th class="r">Playoffs</th><th class="r">Win %</th></tr></thead><tbody>${dyn.map(c=>`<tr><td class="r num">${c.rank}</td><td class="pin">${mlink(c.i)}<div class="sub">${c.titles.length?c.titles.join(', '):'no titles yet'}</div></td><td class="r num"><b>${c.titles.length}</b></td><td class="r num">${c.finals.length}</td><td class="r num">${c.poApps.length}</td><td class="r num">${pct(c.wp)}</td></tr>`).join('')}</tbody></table></div></div>
