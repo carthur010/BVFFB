@@ -358,6 +358,21 @@ button.badge.on{background:var(--soft)}
   .vs-head .nm{font-size:18px}
 }
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* homepage: one consistent card system */
+.hm{display:flex;flex-direction:column;gap:22px}
+.hm .card{padding:20px 22px;display:flex;flex-direction:column}
+.hm .card>.head{margin:0 0 14px!important;padding-bottom:12px;border-bottom:2px solid var(--ink);align-items:center}
+.hm .card>.head h3{font-size:20px}
+.hm .pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:stretch}
+.hm .fill{flex:1;display:flex;flex-direction:column;justify-content:space-between}
+.hm .fill>table{height:100%}
+.hm .rec-row,.hm .wire-item,.hm .ms-row{padding:10px 0}
+.hm .fill>:last-child{border-bottom:0}
+.hm .riv-wrap{align-items:stretch}
+.hm .riv-feat{display:flex;flex-direction:column;justify-content:center}
+.hm .riv-side{justify-content:space-between}
+@media (max-width:860px){.hm .pair{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -1405,14 +1420,14 @@ function wireItems(S,wk,latest){
   if(latest&&!curS.complete&&S===curS&&curS.upcoming&&curS.upcoming.length){const NM=nowModel(); const fav=curS.list.slice().sort((a,b)=>NM.res[b.id].title-NM.res[a.id].title)[0];
     const bubble=curS.list.filter(t=>{const p=NM.res[t.id].po/NM.N; return p>.3&&p<.7;}).sort((a,b)=>NM.res[b.id].po-NM.res[a.id].po);
     add('Odds','w-neu',`${nm(fav.m)} is the title favorite at <b>${f0(NM.res[fav.id].title/NM.N*100)}%</b>.${bubble.length?` On the bubble: ${bubble.map(t=>`${nm(t.m)} (${f0(NM.res[t.id].po/NM.N*100)}%)`).join(', ')}.`:''}`,2);}
-  return items.sort((a,b)=>b.w-a.w).slice(0,8);
+  return items.sort((a,b)=>b.w-a.w).slice(0,6);
 }
 function leagueWire(){
   const S=curS.complete?SEASONS[DONE[DONE.length-1]]:curS;
   const reg=S.games.filter(g=>!g.po);
   const wk=reg.length?Math.max(...reg.map(g=>g.wk)):0; if(!wk) return '';
   const top=wireItems(S,wk,true);
-  return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>League Wire</h3><a class="chip" href="#now">${S.y} Week ${wk}</a></div><div class="wire">${top.map(x=>`<div class="wire-item"><span class="wtag ${x.cls}">${x.tag}</span><span>${x.html}</span></div>`).join('')}</div></div>`;
+  return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>League Wire</h3><a class="chip" href="#now">${S.y} Week ${wk}</a></div><div class="wire fill">${top.map(x=>`<div class="wire-item"><span class="wtag ${x.cls}">${x.tag}</span><span>${x.html}</span></div>`).join('')}</div></div>`;
 }
 function milestoneWatch(){
   const stats=[
@@ -1426,7 +1441,7 @@ function milestoneWatch(){
   C.filter(c=>c.active).forEach(c=>stats.forEach(([label,fn,levels,fm])=>{const v=fn(c), L=levels.find(x=>x>v); if(!L) return; const prev=[0,...levels].filter(x=>x<=v).pop(); const need=L-v;
     rows.push({c,label,v,L,need,fm,pct:(v-prev)/(L-prev),close:need/L});}));
   const top=rows.sort((a,b)=>a.close-b.close).slice(0,6);
-  return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>Milestone Watch</h3><a class="chip" href="#records-career">All milestones</a></div><div class="rec-list">${top.map(r=>`<div class="ms-row"><div class="head" style="align-items:baseline"><span>${mlink(r.c.i)} <span class="sub">needs ${r.fm(r.need)} for ${r.fm(r.L)} ${r.label}</span></span><span class="sub num">${r.fm(r.v)}</span></div><div class="bar"><i style="width:${Math.max(4,Math.min(100,r.pct*100))}%"></i></div></div>`).join('')}</div></div>`;
+  return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>Milestone Watch</h3><a class="chip" href="#records-career">All milestones</a></div><div class="rec-list fill">${top.map(r=>`<div class="ms-row"><div class="head" style="align-items:baseline"><span>${mlink(r.c.i)} <span class="sub">needs ${r.fm(r.need)} for ${r.fm(r.L)} ${r.label}</span></span><span class="sub num">${r.fm(r.v)}</span></div><div class="bar"><i style="width:${Math.max(4,Math.min(100,r.pct*100))}%"></i></div></div>`).join('')}</div></div>`;
 }
 
 // ----- Weekly recap (plain text for the group chat) -----
@@ -1583,27 +1598,27 @@ function vHome(){
   const live=!curS.complete, wkNow=live?Math.min(curWeek+1,curS.reg):1;
   const hist=YEARS.filter(y=>y<CUR).slice().reverse().map(y=>{const gs=SEASONS[y].games.filter(g=>g.wk===wkNow&&!g.multi); if(!gs.length)return null;
     const top=gs.flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,o:g.a},{m:g.a,t:g.at,s:g.as,o:g.h}]).sort((a,b)=>b.s-a.s)[0];
-    const big=gs.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin)[0]; return {y,top,big,po:gs.some(g=>g.po)};}).filter(Boolean).slice(0,8);
+    const big=gs.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin)[0]; return {y,top,big,po:gs.some(g=>g.po)};}).filter(Boolean).slice(0,6);
   const histHtml=hist.map(h=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><span class="rk" style="color:var(--ink)">${h.y}</span><span>${mlink(h.top.m,M[h.top.m].short)} put up <b class="num">${f2(h.top.s)}</b>${h.po?' <span class="pill p-po">Playoffs</span>':''}<div class="sub">Biggest win: ${esc(M[h.big.win].short)} over ${esc(M[h.big.lose].short)} by ${f2(h.big.margin)}</div></span><a class="sub" href="#season-${h.y}">${h.y} ›</a></div>`).join('');
   // classic title games & drought
-  const finals=DONE.map(y=>SEASONS[y].final).filter(g=>g&&!g.multi).sort((a,b)=>a.margin-b.margin).slice(0,4);
+  const finals=DONE.map(y=>SEASONS[y].final).filter(g=>g&&!g.multi).sort((a,b)=>a.margin-b.margin).slice(0,5);
   const drought=ACTIVE.slice().sort((a,b)=>b.curDrought-a.curDrought||a.titles.length-b.titles.length).slice(0,5);
   const explore=[['#standings','All-Time Standings','Every manager since 2011'],['#records','Record Book','Highs, lows, streaks and droughts'],['#franchise','Franchises','Career pages for every manager'],['#h2h','Head-to-Head','Who owns who'],['#achievements','Achievements','Trophies and follies'],['#now',`${CUR} Season`,'Live standings and results']];
-  return `
+  return `<div class="hm">
   <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Rafters</h3><a class="chip" href="#champions">All champions</a></div>${rafters(true)}</div>
-  <div class="grid2" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">${leagueWire()}${milestoneWatch()}</div>
-  <div class="grid2">
+  <div class="pair">${leagueWire()}${milestoneWatch()}</div>
+  <div class="pair">
     <div class="card"><div class="head" style="margin-bottom:6px"><h3>Dynasty Leaderboard</h3><a class="chip" href="#ratings">League Ratings</a></div>
-      <div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Manager</th><th class="r">Titles</th><th class="r">Finals</th><th class="r">Playoffs</th><th class="r">Win %</th></tr></thead><tbody>${dyn.map(c=>`<tr><td class="r num">${c.rank}</td><td class="pin">${mlink(c.i)}<div class="sub">${c.titles.length?c.titles.join(', '):'no titles yet'}</div></td><td class="r num"><b>${c.titles.length}</b></td><td class="r num">${c.finals.length}</td><td class="r num">${c.poApps.length}</td><td class="r num">${pct(c.wp)}</td></tr>`).join('')}</tbody></table></div></div>
-    <div class="card"><div class="head" style="margin-bottom:6px"><h3>Week ${wkNow} in BVFFB History</h3><span class="sub">top score each year</span></div><div class="rec-list">${histHtml}</div></div>
+      <div class="tblwrap fill"><table><thead><tr><th class="r">#</th><th class="pin">Manager</th><th class="r">Titles</th><th class="r">Finals</th><th class="r">Playoffs</th><th class="r">Win %</th></tr></thead><tbody>${dyn.map(c=>`<tr><td class="r num">${c.rank}</td><td class="pin">${mlink(c.i)}<div class="sub">${c.titles.length?c.titles.join(', '):'no titles yet'}</div></td><td class="r num"><b>${c.titles.length}</b></td><td class="r num">${c.finals.length}</td><td class="r num">${c.poApps.length}</td><td class="r num">${pct(c.wp)}</td></tr>`).join('')}</tbody></table></div></div>
+    <div class="card"><div class="head" style="margin-bottom:6px"><h3>Week ${wkNow} in History</h3><a class="chip" href="#timeline">Timeline</a></div><div class="rec-list fill">${histHtml}</div></div>
   </div>
   <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Record Book</h3><a class="chip" href="#records">All records</a></div><div class="tiles">${watch.map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v num">${t[1]}</div><div class="sub">${esc(String(t[2]))}</div></div>`).join('')}</div></div>
   ${rivalrySpotlight()}
-  <div class="grid2">
-    <div class="card"><h3>Classic Title Games</h3><div class="rec-list">${finals.map(g=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><span class="rk" style="color:var(--ink)">${g.y}</span><span>${mlink(g.win,M[g.win].short)} over ${mlink(g.lose,M[g.lose].short)}<div class="sub num">${f2(g.ws)}–${f2(g.ls)}</div></span><span class="val">${f2(g.margin)}</span></div>`).join('')}</div><p class="note">The closest championship games ever, by margin.</p></div>
-    <div class="card"><h3>Title Drought Clock</h3><div class="rec-list">${drought.map(c=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(c.i)}<div class="sub">${c.titles.length?'last title '+c.titles[c.titles.length-1]:'never won · since '+c.years[0]}</div></span><span class="val">${c.curDrought} yrs</span></div>`).join('')}</div></div>
+  <div class="pair">
+    <div class="card"><div class="head"><h3>Closest Title Games</h3><a class="chip" href="#champions">All champions</a></div><div class="rec-list fill">${finals.map(g=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><span class="rk" style="color:var(--ink)">${g.y}</span><span>${mlink(g.win,M[g.win].short)} over ${mlink(g.lose,M[g.lose].short)}<div class="sub num">${f2(g.ws)}–${f2(g.ls)}</div></span><span class="val">${f2(g.margin)}</span></div>`).join('')}</div></div>
+    <div class="card"><div class="head"><h3>Title Drought Clock</h3><a class="chip" href="#franchise">Franchises</a></div><div class="rec-list fill">${drought.map(c=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(c.i)}<div class="sub">${c.titles.length?'last title '+c.titles[c.titles.length-1]:'never won · since '+c.years[0]}</div></span><span class="val">${c.curDrought} yrs</span></div>`).join('')}</div></div>
   </div>
-  <div class="explore">${explore.map(e=>`<a href="${e[0]}"><b>${e[1]}</b><span>${e[2]}</span></a>`).join('')}</div>`;
+  <div class="explore">${explore.map(e=>`<a href="${e[0]}"><b>${e[1]}</b><span>${e[2]}</span></a>`).join('')}</div></div>`;
 }
 
 // ----- This season -----
