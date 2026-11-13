@@ -308,6 +308,15 @@ a.tile.bw:hover{background:var(--line)}
   .grid-rec{grid-template-columns:1fr}
   .foot{flex-direction:column}
 }
+button.riv{font:inherit;text-align:left;border:0;cursor:pointer;width:100%}
+.riv:hover{border-left-color:var(--gold)}
+.riv.on{background:var(--surface);outline:2px solid var(--accent);outline-offset:-2px;border-left-color:var(--gold)}
+.riv-gow.on{background:var(--navy);outline-color:var(--gold)}
+.riv-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--accent);text-align:center}
+.riv-fam{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.riv-pair{font:inherit;font-size:13px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.riv-pair:hover{border-color:var(--accent)}
+.riv-pair.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .mu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
 .mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:12px}
 .mu-side{display:flex;flex-direction:column;gap:4px}
@@ -1291,25 +1300,55 @@ function vAch(){
 }
 
 // ----- rivalry spotlight (home) -----
+let RIV_SEL=null, RIV_LAB=null;
 function rivalrySpotlight(){
-  const pairs=[]; ACTIVE.forEach(a=>ACTIVE.forEach(b=>{ if(a.i<b.i){const h=a.h2h[b.i]; if(h&&h.n) pairs.push({a,b,h});}}));
+  const pairs=[]; ACTIVE.forEach(a=>ACTIVE.forEach(b=>{ if(a.i<b.i){const h=a.h2h[b.i]; if(h&&h.n) pairs.push({a,b,h,key:a.i+'-'+b.i});}}));
   if(!pairs.length) return '';
-  const lead=(p)=>p.h.w>=p.h.l?{x:p.a,y:p.b,w:p.h.w,l:p.h.l}:{x:p.b,y:p.a,w:p.h.l,l:p.h.w};
+  const byKey=k=>pairs.find(p=>p.key===k);
+  const lead=p=>p.h.w>=p.h.l?{x:p.a,y:p.b,w:p.h.w,l:p.h.l}:{x:p.b,y:p.a,w:p.h.l,l:p.h.w};
   const curStreak=p=>{const L=p.h.list; const last=L[L.length-1]; let n=0; for(let k=L.length-1;k>=0&&L[k].r===last.r;k--)n++; return {n,who:last.r==='W'?p.a:last.r==='L'?p.b:null};};
   const longest=p=>{let best={n:0},cur=null; p.h.list.forEach(x=>{if(x.r==='T'){cur=null;return;} if(cur&&cur.r===x.r){cur.n++; cur.to=x.y;} else cur={r:x.r,n:1,from:x.y,to:x.y}; if(cur.n>best.n)best={...cur};}); return {...best,who:best.r==='W'?p.a:p.b};};
-  // featured: closest long-running
-  const feat=pairs.filter(p=>p.h.n>=12).sort((x,y)=>Math.abs(x.h.w-x.h.l)-Math.abs(y.h.w-y.h.l)||y.h.n-x.h.n)[0]||pairs[0];
+  // the rivalries
+  const closest=pairs.filter(p=>p.h.n>=12).sort((x,y)=>Math.abs(x.h.w-x.h.l)-Math.abs(y.h.w-y.h.l)||y.h.n-x.h.n)[0]||pairs[0];
+  const most=pairs.slice().sort((x,y)=>y.h.n-x.h.n)[0];
+  const lop=pairs.filter(p=>p.h.n>=10).sort((x,y)=>Math.abs(y.h.w-y.h.l)/y.h.n-Math.abs(x.h.w-x.h.l)/x.h.n)[0];
+  const strk=pairs.map(p=>({p,s:curStreak(p)})).filter(x=>x.s.who).sort((x,y)=>y.s.n-x.s.n)[0];
+  const poR=pairs.filter(p=>p.h.pw+p.h.pl>0).sort((x,y)=>(y.h.pw+y.h.pl)-(x.h.pw+x.h.pl)||y.h.n-x.h.n)[0];
+  const fam=ACTIVE.filter(c=>/sarget/i.test(c.name));
+  const famPairs=pairs.filter(p=>fam.includes(p.a)&&fam.includes(p.b)).sort((x,y)=>Math.abs(x.h.w-x.h.l)-Math.abs(y.h.w-y.h.l));
+  let gow=null;
+  if(!curS.complete&&curS.upcoming&&curS.upcoming.length){
+    const wk=Math.min(...curS.upcoming.map(g=>g.wk));
+    const c=curS.upcoming.filter(g=>g.wk===wk).map(g=>{const a=Math.min(g.ht.m,g.at.m),b=Math.max(g.ht.m,g.at.m),p=byKey(a+'-'+b); return {g,p,wk,score:p?p.h.n-3*Math.abs(p.h.w-p.h.l):-99};}).filter(x=>x.p).sort((x,y)=>y.score-x.score)[0];
+    if(c) gow=c;
+  }
+  const L=p=>lead(p);
+  // menu items: [key, label, line, sub, cls]
+  const items=[];
+  items.push([closest.key,'Closest rivalry',`${esc(closest.a.m.short)} ${closest.h.w}-${closest.h.l} ${esc(closest.b.m.short)}`,`${closest.h.n} meetings, ${closest.h.w===closest.h.l?'dead even':`separated by ${Math.abs(closest.h.w-closest.h.l)}`}`,'']);
+  if(gow) items.push([gow.p.key,`Rivalry game of Week ${gow.wk}`,`${esc(M[gow.g.ht.m].short)} vs ${esc(M[gow.g.at.m].short)}`,`${gow.p.h.w}-${gow.p.h.l} all-time · ${esc(gow.g.ht.n)} vs ${esc(gow.g.at.n)}`,'riv-gow']);
+  items.push([most.key,'Most played',`${esc(L(most).x.m.short)} ${L(most).w}-${L(most).l} ${esc(L(most).y.m.short)}`,`${most.h.n} meetings since ${most.h.list[0].y}`,'']);
+  if(lop) items.push([lop.key,'Most lopsided',`${esc(L(lop).x.m.short)} ${L(lop).w}-${L(lop).l} ${esc(L(lop).y.m.short)}`,`${f0(L(lop).w/lop.h.n*100)}% for one side`,'']);
+  if(strk) items.push([strk.p.key,'Longest active streak',`${esc(strk.s.who.m.short)} has won ${strk.s.n} straight`,`vs ${esc((strk.s.who===strk.p.a?strk.p.b:strk.p.a).m.short)}`,'']);
+  if(poR) items.push([poR.key,'Biggest playoff rivalry',`${esc(L(poR).x.m.short)} ${Math.max(poR.h.pw,poR.h.pl)}-${Math.min(poR.h.pw,poR.h.pl)} ${esc(L(poR).y.m.short)}`,`${poR.h.pw+poR.h.pl} playoff meetings`,'']);
+  // featured selection
+  let feat=(RIV_SEL&&byKey(RIV_SEL))||closest;
+  const featItem=items.find(x=>x[0]===feat.key&&x[1]===RIV_LAB)||items.find(x=>x[0]===feat.key);
+  const featLabel=featItem?featItem[1]:(famPairs.includes(feat)?'Sargetis family feud':'Rivalry');
   const {a,b,h}=feat;
   const sg=h.list.filter(x=>!x.g.multi);
   const bigA=sg.filter(x=>x.r==='W').sort((p,q)=>(q.ms-q.os)-(p.ms-p.os))[0], bigB=sg.filter(x=>x.r==='L').sort((p,q)=>(p.ms-p.os)-(q.ms-q.os))[0];
   const cs=curStreak(feat), ls=longest(feat);
-  const last5=h.list.slice(-6).reverse();
+  const last6=h.list.slice(-6).reverse();
   const nextMeet=(curS.upcoming||[]).filter(g=>(g.ht.m===a.i&&g.at.m===b.i)||(g.ht.m===b.i&&g.at.m===a.i)).sort((x,y)=>x.wk-y.wk)[0];
-  const chip=x=>{const w=x.r==='W'?a:x.r==='L'?b:null; return `<a class="mtg ${x.r==='W'?'mtg-a':x.r==='L'?'mtg-b':''}" href="#season-${x.y}" title="${x.y} Wk ${x.wk}${x.po?' (playoffs)':''}: ${esc(a.m.short)} ${f2(x.ms)}, ${esc(b.m.short)} ${f2(x.os)}"><b>${w?esc(w.m.short.split(' ')[0]):'Tie'}</b><span>${x.y}${x.po?' PO':''}</span><span class="num">${f1(Math.max(x.ms,x.os))}–${f1(Math.min(x.ms,x.os))}</span></a>`;};
+  const chip=x=>{const w=x.r==='W'?a:x.r==='L'?b:null; return `<a class="mtg ${x.r==='W'?'mtg-a':x.r==='L'?'mtg-b':''}" href="#season-${x.y}" title="${x.y} Wk ${x.wk}${x.po?' (playoffs)':''}: ${esc(a.m.short)} ${f2(x.ms)}, ${esc(b.m.short)} ${f2(x.os)}"><b>${w?esc(w.m.short):'Tie'}</b><span>${x.y}${x.po?' PO':''}</span><span class="num">${f1(Math.max(x.ms,x.os))}–${f1(Math.min(x.ms,x.os))}</span></a>`;};
   const tile=(k,v,s)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div>${s?`<div class="sub">${s}</div>`:''}</div>`;
+  const diff=Math.abs(h.w-h.l), ld=lead(feat);
+  const blurb=`${h.n} meetings since ${h.list[0].y}, ${h.w===h.l?'dead even':`${esc(ld.x.m.short)} up by ${diff}`}.${h.pw+h.pl?` ${h.pw+h.pl} in the playoffs.`:''}`;
   const featHtml=`
+    <div class="riv-label">${esc(featLabel)}</div>
     <div class="vs-head" style="margin:4px 0 6px"><div><div class="nm" style="font-size:22px">${mlink(a.i)}</div><div class="sub">${esc(a.curTeam)}</div></div><div class="big num" style="font-size:52px">${h.w}–${h.l}${h.t?`<span class="sub" style="font-size:18px">–${h.t}</span>`:''}</div><div><div class="nm" style="font-size:22px">${mlink(b.i)}</div><div class="sub">${esc(b.curTeam)}</div></div></div>
-    <p class="note" style="text-align:center;margin:0 0 12px">${h.n} meetings since ${h.list[0].y}${h.w===h.l?', dead even':`, separated by ${Math.abs(h.w-h.l)} game${Math.abs(h.w-h.l)>1?'s':''}`}. The closest long-running rivalry in the league.</p>
+    <p class="note" style="text-align:center;margin:0 0 12px">${blurb}</p>
     <div class="tiles">
       ${tile('Playoff meetings',`${h.pw}-${h.pl}`,h.pw+h.pl?'':'never met in the playoffs')}
       ${tile('Avg score',`${f1(h.pf/h.n)}–${f1(h.pa/h.n)}`)}
@@ -1318,36 +1357,14 @@ function rivalrySpotlight(){
       ${bigA?tile(`${esc(a.m.short)} biggest win`,`+${f1(bigA.ms-bigA.os)}`,`${bigA.y} Wk ${bigA.wk}`):''}
       ${bigB?tile(`${esc(b.m.short)} biggest win`,`+${f1(bigB.os-bigB.ms)}`,`${bigB.y} Wk ${bigB.wk}`):''}
     </div>
-    <div class="head" style="margin:14px 0 6px"><span class="sub" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700">Last ${last5.length} meetings</span>${nextMeet?`<span class="pill p-live">Next: ${CUR} Week ${nextMeet.wk}</span>`:''}</div>
-    <div class="mtgs">${last5.map(chip).join('')}</div>
+    <div class="head" style="margin:14px 0 6px"><span class="sub" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700">Last ${last6.length} meetings</span>${nextMeet?`<span class="pill p-live">Next: ${CUR} Week ${nextMeet.wk}</span>`:''}</div>
+    <div class="mtgs">${last6.map(chip).join('')}</div>
     <div style="text-align:center;margin-top:12px"><a class="chip" href="#versus-${a.i}-${b.i}">Full breakdown</a></div>`;
-  // other rivalries
-  const most=pairs.slice().sort((x,y)=>y.h.n-x.h.n)[0];
-  const lop=pairs.filter(p=>p.h.n>=10).sort((x,y)=>Math.abs(y.h.w-y.h.l)/y.h.n-Math.abs(x.h.w-x.h.l)/x.h.n)[0];
-  const strk=pairs.map(p=>({p,s:curStreak(p)})).filter(x=>x.s.who).sort((x,y)=>y.s.n-x.s.n)[0];
-  const poR=pairs.filter(p=>p.h.pw+p.h.pl>0).sort((x,y)=>(y.h.pw+y.h.pl)-(x.h.pw+x.h.pl)||y.h.n-x.h.n)[0];
-  const fam=ACTIVE.filter(c=>/sarget/i.test(c.name));
-  const famPairs=pairs.filter(p=>fam.includes(p.a)&&fam.includes(p.b));
+  const menu=items.map(([k,lab,line,sub,cls])=>`<button type="button" class="riv ${cls} ${k===feat.key&&lab===featLabel?'on':''}" data-riv="${k}" data-lab="${esc(lab)}" aria-pressed="${k===feat.key&&lab===featLabel}"><span class="k">${lab}</span><b>${line}</b><span class="sub">${sub}</span></button>`).join('');
   const famTot=fam.map(c=>{let w=0,l=0; fam.forEach(o=>{if(o!==c){const hh=c.h2h[o.i]; if(hh){w+=hh.w;l+=hh.l;}}}); return {c,w,l};}).sort((x,y)=>y.w-x.w);
-  const mini=(title,p,line,sub)=>p?`<a class="riv" href="#versus-${p.a.i}-${p.b.i}"><span class="k">${title}</span><b>${line}</b><span class="sub">${sub}</span></a>`:'';
-  const L=p=>lead(p);
-  const others=[
-    mini('Most played',most,`${esc(L(most).x.m.short)} ${L(most).w}-${L(most).l} ${esc(L(most).y.m.short)}`,`${most.h.n} meetings since ${most.h.list[0].y}`),
-    lop?mini('Most lopsided',lop,`${esc(L(lop).x.m.short)} ${L(lop).w}-${L(lop).l} ${esc(L(lop).y.m.short)}`,`${f0(L(lop).w/lop.h.n*100)}% for one side`):'',
-    strk?mini('Longest active streak',strk.p,`${esc(strk.s.who.m.short)} has won ${strk.s.n} straight`,`vs ${esc((strk.s.who===strk.p.a?strk.p.b:strk.p.a).m.short)}`):'',
-    poR?mini('Biggest playoff rivalry',poR,`${esc(poR.a.m.short)} ${poR.h.pw}-${poR.h.pl} ${esc(poR.b.m.short)}`,`${poR.h.pw+poR.h.pl} playoff meetings`):'',
-    famPairs.length?`<div class="riv"><span class="k">Sargetis family feud</span><b>${famTot.map(x=>`${esc(x.c.m.short)} ${x.w}-${x.l}`).join(' · ')}</b><span class="sub">${famPairs.map(p=>`<a class="mgr" href="#versus-${p.a.i}-${p.b.i}">${esc(p.a.m.short.split(' ')[0])} ${p.h.w}-${p.h.l} ${esc(p.b.m.short.split(' ')[0])}</a>`).join(' · ')}</span></div>`:'',
-  ].join('');
-  // game of the week
-  let gow='';
-  if(!curS.complete&&curS.upcoming&&curS.upcoming.length){
-    const wk=Math.min(...curS.upcoming.map(g=>g.wk));
-    const cand=curS.upcoming.filter(g=>g.wk===wk).map(g=>{const hh=C[g.ht.m].h2h[g.at.m]; return {g,hh,score:hh?hh.n-3*Math.abs(hh.w-hh.l):0};}).sort((x,y)=>y.score-x.score)[0];
-    if(cand&&cand.hh){const g=cand.g, hh=cand.hh, Ls=hh.list[hh.list.length-1];
-      gow=`<a class="riv riv-gow" href="#now"><span class="k">Rivalry game of Week ${wk}</span><b>${esc(M[g.ht.m].short)} vs ${esc(M[g.at.m].short)}</b><span class="sub">${hh.w}-${hh.l}${hh.t?'-'+hh.t:''} all-time · last met ${Ls.y} Wk ${Ls.wk} · ${esc(g.ht.n)} vs ${esc(g.at.n)}</span></a>`;}
-  }
-  return `<div class="card"><div class="head" style="margin-bottom:10px"><h3>Rivalry Spotlight</h3><a class="chip" href="#h2h">Head-to-Head</a></div>
-    <div class="riv-wrap"><div class="riv-feat">${featHtml}</div><div class="riv-side">${gow}${others}</div></div></div>`;
+  const famHtml=famPairs.length?`<div class="riv ${famPairs.includes(feat)?'on':''}"><span class="k">Sargetis family feud</span><b>${famTot.map(x=>`${esc(x.c.m.short)} ${x.w}-${x.l}`).join(' · ')}</b><span class="riv-fam">${famPairs.map(p=>`<button type="button" class="riv-pair ${p===feat?'on':''}" data-riv="${p.key}">${esc(p.a.m.short)} ${p.h.w}-${p.h.l} ${esc(p.b.m.short)}</button>`).join('')}</span></div>`:'';
+  return `<div class="card" id="riv-card"><div class="head" style="margin-bottom:10px"><h3>Rivalry Spotlight</h3><a class="chip" href="#h2h">Head-to-Head</a></div>
+    <div class="riv-wrap"><div class="riv-feat">${featHtml}</div><div class="riv-side">${menu}${famHtml}</div></div></div>`;
 }
 
 // ----- League Wire & Milestone Watch (home) -----
@@ -1820,6 +1837,7 @@ function route(){
 }
 function wire(){
   wireSearch(); wireHeader();
+  document.querySelectorAll('#riv-card [data-riv]').forEach(b=>b.onclick=()=>{RIV_SEL=b.dataset.riv; RIV_LAB=b.dataset.lab||'Sargetis family feud'; const card=document.getElementById('riv-card'); card.outerHTML=rivalrySpotlight(); wire(); const n=document.getElementById('riv-card'); if(window.innerWidth<800&&n) n.scrollIntoView({behavior:'smooth',block:'start'});});
   const ys=document.getElementById('yr-sel'); if(ys) ys.onchange=()=>{location.hash='season-'+ys.value;};
   document.querySelectorAll('.wkb').forEach(b=>b.onclick=()=>{SEASON_WK[+b.dataset.y]=+b.dataset.wk; const yy=window.scrollY; route(); window.scrollTo(0,yy);});
   const rw=document.getElementById('recap-wk'); if(rw) rw.onchange=()=>{RECAP_WK=+rw.value; document.getElementById('recap').outerHTML=recapCard(); wire();};
