@@ -58,7 +58,7 @@ button,select{font-family:inherit;font-size:14px}
 .num{font-variant-numeric:tabular-nums}
 
 header.top{background:var(--navy);color:#fff;border-bottom:4px solid var(--accent)}
-.top-inner{max-width:1240px;margin:0 auto;padding:18px 20px 0;display:flex;flex-direction:column;gap:14px}
+.top-inner{max-width:1600px;margin:0 auto;padding:18px clamp(16px,2.5vw,40px) 0;display:flex;flex-direction:column;gap:14px}
 .brand{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .brand h1{font-size:40px;font-weight:800;line-height:1;text-transform:uppercase}
 .brand h1 span{color:var(--accent)}
@@ -69,7 +69,7 @@ nav.tabs a{font-family:var(--display);text-transform:uppercase;font-weight:700;f
 nav.tabs a:hover{color:#fff;background:rgba(255,255,255,.06)}
 nav.tabs a.on{background:var(--accent);color:#fff}
 
-main{max-width:1240px;margin:0 auto;padding:22px 20px 60px;display:flex;flex-direction:column;gap:22px}
+main{max-width:1600px;margin:0 auto;padding:22px clamp(16px,2.5vw,40px) 60px;display:flex;flex-direction:column;gap:22px}
 .subtabs{display:flex;gap:6px;flex-wrap:wrap}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);text-decoration:none;font-weight:600;font-size:14px;cursor:pointer;color:var(--ink)}
 .chip:hover{border-color:var(--accent)}
@@ -282,7 +282,7 @@ a.tile.bw:hover{background:var(--line)}
 .rc-tiles{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 .rc-top{border-top-color:var(--good)}.rc-low{border-top-color:var(--bad)}
 .search-btn{display:none;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:8px;width:40px;height:40px;place-items:center;cursor:pointer}
-.foot{max-width:1240px;margin:0 auto;padding:22px 20px 40px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted)}
+.foot{max-width:1600px;margin:0 auto;padding:22px clamp(16px,2.5vw,40px) 40px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted)}
 .foot a{color:var(--muted)}
 .grid-rec{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
 .badges .more-b{border-style:dashed;color:var(--muted)}
