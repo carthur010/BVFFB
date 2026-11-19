@@ -431,6 +431,9 @@ main>.mx-two{gap:22px}
 .lu-warn{background:var(--bad-bg);border-radius:6px}
 .lu-bad{background:var(--bad-bg);color:var(--bad)}.lu-q{background:#fff4d6;color:#8a6100}
 @media (max-width:800px){.lu-row{grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);gap:6px}.lu-side{grid-template-columns:minmax(0,1fr) 40px}.lu-side.r{grid-template-columns:40px minmax(0,1fr)}.lu-side>:nth-child(2){display:none}.lu-p .sub{display:none}}
+.bk-link{display:block;padding:6px 10px;font-size:12px;font-weight:600;border-top:1px solid var(--line);text-decoration:none;color:var(--accent);background:var(--surface)}
+.mx-two>.card{display:flex;flex-direction:column}
+.mx-two .mx-tape{flex:1;justify-content:space-between}
 </style>
 </head>
 <body>
@@ -509,7 +512,8 @@ YEARS.forEach(y=>{
   s.T.forEach(t=>{teams[t[0]]={id:t[0],m:t[1],n:t[2],f:t[3],seed:t[4],w:t[5],l:t[6],t:t[7],pf:t[8],pa:t[9],y};});
   const allG = s.G.split(';').filter(Boolean);
   const upcoming = allG.filter(x=>x.endsWith(',U')).map(x=>{const p=x.split(','); return {y,wk:+p[0],ht:teams[+p[1]],at:teams[+p[3]]};});
-  const games = allG.filter(x=>!x.endsWith(',U')).map(x=>{
+  const poUp = allG.filter(x=>x.endsWith(',Q')).map(x=>{const p=x.split(','); return {y,wk:+p[0],ht:teams[+p[1]],at:teams[+p[3]],po:true};});
+  const games = allG.filter(x=>!x.endsWith(',U')&&!x.endsWith(',Q')).map(x=>{
     const p=x.split(','); const ht=teams[+p[1]], at=teams[+p[3]];
     return {y,wk:+p[0],ht,at,h:ht.m,a:at.m,hs:+p[2],as:+p[4],po:p[5]==='P'};
   });
@@ -518,7 +522,7 @@ YEARS.forEach(y=>{
   games.forEach(g=>{(g.po?poS:regS).push(g.hs,g.as);});
   const twoWk = poS.length>0 && avg(poS) > 1.5*avg(regS);
   games.forEach(g=>{g.multi = g.po && twoWk; GAMES.push(g);});
-  SEASONS[y] = {y,reg:s.reg,po:s.po,teams,list:Object.values(teams),games,complete,twoWk,upcoming};
+  SEASONS[y] = {y,reg:s.reg,po:s.po,teams,list:Object.values(teams),games,complete,twoWk,upcoming,poUp};
 });
 const CUR = YEARS[YEARS.length-1];
 const DONE = YEARS.filter(y=>SEASONS[y].complete);
@@ -1618,12 +1622,14 @@ function lineupCard(A,B,wk){
 function vMatchup(aid,bid){
   const back=`<a class="chip" href="#now">‹ ${CUR} Season</a>`;
   if(curS.complete) return `<div class="card">${back}<p class="note">The ${CUR} season is over.</p></div>`;
-  const NM=nowModel(), {list,po,G,lastWk,sc,model,up,remaining,winP,res,N,status,sos,cond,nxW,lgM}=NM;
+  const NM=nowModel(), {list,po,G,lastWk,sc,model,up,remaining,winP,tm,LW,res,N,status,sos,cond,nxW,lgM}=NM;
   const A=list.find(t=>t.id===aid), B=list.find(t=>t.id===bid);
   if(!A||!B) return `<div class="card">${back}<p class="note">Matchup not found.</p></div>`;
-  const game=up.find(g=>(g.ht===A&&g.at===B)||(g.ht===B&&g.at===A));
+  const isG=g=>(g.ht===A&&g.at===B)||(g.ht===B&&g.at===A);
+  const game=up.find(isG)||(curS.poUp||[]).find(isG), isPO=!!(game&&game.po);
+  if(!game) return `<div class="card">${back}<h3 style="margin-top:12px">No upcoming game</h3><p class="note">${esc(A.n)} and ${esc(B.n)} don't have a game left on the schedule. <a href="#versus-${A.m}-${B.m}">See their head-to-head history</a>.</p></div>`;
   const wk=game?game.wk:nxW;
-  const pa=winP(A,B), pb=1-pa;
+  const pa=winP(A,B,wk), pb=1-pa, TA=tm(A,wk), TB=tm(B,wk);
   const stand=list.slice().sort((x,y)=>(y.w+y.t/2)-(x.w+x.t/2)||y.pf-x.pf), rank=t=>stand.indexOf(t)+1;
   const pc=x=>{const p=x*100; return p>=99.95?'>99.9%':p<=0.05&&x>0?'<0.1%':x===0?'0%':f1(p)+'%';};
   const scores=t=>sc[t.id].map(x=>x.s);
@@ -1632,14 +1638,14 @@ function vMatchup(aid,bid){
   const hiWks=t=>sc[t.id].filter(x=>{const all=(weekly[curS.y+'-'+x.wk]||[]).map(o=>o.s); return x.s>=Math.max(...all);}).length;
   const form=t=>sc[t.id].slice(-5).map(x=>`<span class="fdot ${x.s>x.o?'w':x.s<x.o?'l':''}" title="Wk ${x.wk}: ${f2(x.s)}-${f2(x.o)}">${x.s>x.o?'W':x.s<x.o?'L':'T'}</span>`).join('');
   const sosR=list.filter(t=>remaining[t.id].length).slice().sort((x,y)=>sos[y.id]-sos[x.id]);
-  const side=(t,p,al)=>`<div class="mx-side ${al}"><div class="mx-seed">#${rank(t)} seed</div><div class="mx-tn">${esc(t.n)}</div><div>${mlink(t.m)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG</div><div class="mx-form">${form(t)}</div><div class="mx-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div><div class="sub">Proj. ${f1(model[t.id].mu)}</div></div>`;
-  const spread=Math.abs(model[A.id].mu-model[B.id].mu), favT=model[A.id].mu>=model[B.id].mu?A:B;
-  const tsd=t=>Math.sqrt(model[t.id].sig**2+model[t.id].se**2);
-  const rangeTile=t=>`<div class="tile"><div class="k">${esc(M[t.m].short)}'s likely range</div><div class="v num">${f0(model[t.id].mu-1.2816*tsd(t))}–${f0(model[t.id].mu+1.2816*tsd(t))}</div><div class="sub">8 in 10 weeks land here</div></div>`;
-  const dmu=model[A.id].mu-model[B.id].mu, dsd=Math.sqrt(tsd(A)**2+tsd(B)**2);
+  const side=(t,p,al)=>`<div class="mx-side ${al}"><div class="mx-seed">#${rank(t)} seed</div><div class="mx-tn">${esc(t.n)}</div><div>${mlink(t.m)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG</div><div class="mx-form">${form(t)}</div><div class="mx-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div><div class="sub">Proj. ${f1(tm(t,wk).mu)}</div></div>`;
+  const spread=Math.abs(TA.mu-TB.mu), favT=TA.mu>=TB.mu?A:B;
+  const tsd=t=>tm(t,wk).sd;
+  const rangeTile=t=>`<div class="tile"><div class="k">${esc(M[t.m].short)}'s likely range</div><div class="v num">${f0(tm(t,wk).mu-1.2816*tsd(t))}–${f0(tm(t,wk).mu+1.2816*tsd(t))}</div><div class="sub">8 in 10 weeks land here</div></div>`;
+  const dmu=TA.mu-TB.mu, dsd=Math.sqrt(tsd(A)**2+tsd(B)**2);
   const pClose=Phi((5-dmu)/dsd)-Phi((-5-dmu)/dsd), pBlow=1-Phi((40-dmu)/dsd)+Phi((-40-dmu)/dsd);
-  const hero=`<div class="card mx-hero"><div class="mx-top">${back}<span class="pill p-live">Week ${wk}</span></div>
-    <div class="mx-grid">${side(A,pa,'l')}<div class="mx-mid"><div class="mx-vs">vs</div><div class="sub">${esc(M[favT.m].short)} by ${f1(spread)}</div></div>${side(B,pb,'r')}</div>
+  const hero=`<div class="card mx-hero"><div class="mx-top">${back}<span class="pill p-live">${isPO?(wk===curS.reg+3?'Championship':wk===curS.reg+2?'Semifinal':'Quarterfinal')+' · ':''}Week ${wk}</span></div>
+    <div class="mx-grid">${side(A,pa,'l')}<div class="mx-mid"><div class="mx-vs">vs</div><div class="sub">${esc(M[favT.m].short)} by ${f1(spread)}</div><div class="sub mx-basis">${TA.lu&&TB.lu?'based on this week\'s lineups':'based on season scoring'}</div></div>${side(B,pb,'r')}</div>
     <div class="mx-bar"><i style="width:${pa*100}%"></i></div>
     <div class="tiles" style="margin-top:16px">${rangeTile(A)}${rangeTile(B)}
       <div class="tile"><div class="k">Nail-biter</div><div class="v num">${f0(pClose*100)}%</div><div class="sub">decided by under 5</div></div>
@@ -1682,7 +1688,11 @@ function vMatchup(aid,bid){
     // don't repeat a playoff clinch line when the bye line covers the same case
     return lines;};
   const scenHtml=t=>{const L=scen(t); return `<div class="mx-lbl">This week's scenarios</div>${L.length?`<ul class="mx-scen">${L.map(x=>`<li>${x}.</li>`).join('')}</ul>`:'<p class="note" style="margin:0">Nothing can be clinched or lost for good this week.</p>'}`;};
-  const stakes=wk===nxW?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Playoff Stakes</h3><span class="sub">from ${N.toLocaleString()} season simulations</span></div><div class="mx-two">${stake(A)}${stake(B)}</div></div>`:'';
+  const BS=isPO?bracketSim():null;
+  const poStake=t=>{const c=BS.cond[t.id], r=BS.res[t.id]; const now=r.title/BS.N, w=c.w?c.wt/c.w:0;
+    return `<div class="tile"><div class="k">${esc(M[t.m].short)}'s title odds</div><div class="v num">${f0(now*100)}%</div><div class="sub">${f0(w*100)}% with a win · out with a loss</div></div>`;};
+  const poStakes=BS?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Playoff Stakes</h3><span class="sub">win or go home · ${BS.N.toLocaleString()} bracket simulations</span></div><div class="tiles">${poStake(A)}${poStake(B)}</div></div>`:'';
+  const stakes=isPO?poStakes:wk===nxW?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Playoff Stakes</h3><span class="sub">from ${N.toLocaleString()} season simulations</span></div><div class="mx-two">${stake(A)}${stake(B)}</div></div>`:'';
   // upset watch
   const fav=pa>=pb?A:B, dog=fav===A?B:A, fp=Math.max(pa,pb), HP=histProbs();
   let band=.05, sim=HP.filter(x=>Math.abs(x.p-fp)<=band); while(sim.length<40&&band<.2){band+=.03; sim=HP.filter(x=>Math.abs(x.p-fp)<=band);}
@@ -1744,12 +1754,12 @@ function vMatchup(aid,bid){
   } else h2hHtml=`<div class="card"><h3>All-Time Head-to-Head</h3><p class="note">First ever meeting.</p></div>`;
   // rest of schedule
   const restRow=t=>{const r=up.filter(g=>(g.ht===t||g.at===t)&&g.wk!==wk).sort((x,y)=>x.wk-y.wk);
-    return `<div><div class="mx-sh">${esc(t.n)}</div><div class="rec-list">${r.length?r.map(g=>{const o=g.ht===t?g.at:g.ht, p=winP(t,o); return `<div class="rec-row" style="grid-template-columns:52px 1fr auto"><span class="sub">Wk ${g.wk}</span><span><a href="#matchup-${t.id}-${o.id}" class="mgr">${esc(o.n)}</a><div class="sub">${rec(o.w,o.l,o.t)}</div></span><span class="num ${p>=.5?'better':''}">${f0(p*100)}%</span></div>`;}).join(''):'<p class="note">No games left after this one.</p>'}</div></div>`;};
-  const rest=`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Rest of the Schedule</h3><span class="sub">win chance each week</span></div><div class="mx-two">${restRow(A)}${restRow(B)}</div></div>`;
+    return `<div><div class="mx-sh">${esc(t.n)}</div><div class="rec-list">${r.length?r.map(g=>{const o=g.ht===t?g.at:g.ht, p=winP(t,o,g.wk); return `<div class="rec-row" style="grid-template-columns:52px 1fr auto"><span class="sub">Wk ${g.wk}</span><span><a href="#matchup-${t.id}-${o.id}" class="mgr">${esc(o.n)}</a><div class="sub">${rec(o.w,o.l,o.t)}</div></span><span class="num ${p>=.5?'better':''}">${f0(p*100)}%</span></div>`;}).join(''):'<p class="note">No games left after this one.</p>'}</div></div>`;};
+  const rest=isPO?'':`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Rest of the Schedule</h3><span class="sub">win chance each week</span></div><div class="mx-two">${restRow(A)}${restRow(B)}</div></div>`;
   // other games this week
-  const others=up.filter(g=>g.wk===wk&&g!==game);
+  const others=(isPO?curS.poUp:up).filter(g=>g.wk===wk&&g!==game);
   const otherHtml=others.length?`<div class="mx-others">${others.map(g=>`<a href="#matchup-${g.ht.id}-${g.at.id}">${esc(M[g.ht.m].short)} vs ${esc(M[g.at.m].short)}</a>`).join('')}</div>`:'';
-  return `${hero}${lineupCard(A,B,wk)}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} Matchups</h3></div>${otherHtml}</div>`:''}`;
+  return `${hero}${lineupCard(A,B,wk)}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} ${isPO?'Playoff ':''}Matchups</h3></div>${otherHtml}</div>`:''}`;
 }
 // ----- League timeline -----
 function vTimeline(){
@@ -1892,7 +1902,13 @@ function nowModel(){
     model[t.id]={mu,sig,se:UNC*sig/Math.sqrt(n+K)};});
   const up=S.upcoming.filter(g=>g.wk<=G).sort((a,b)=>a.wk-b.wk);
   const remaining={}; list.forEach(t=>remaining[t.id]=up.filter(g=>g.ht===t||g.at===t).map(g=>g.ht===t?g.at:g.ht));
-  const winP=(a,b)=>{const A=model[a.id],B=model[b.id]; return Phi((A.mu-B.mu)/Math.sqrt(A.sig**2+B.sig**2+A.se**2+B.se**2));};
+    // Lineup-based projections for the week lineups were pulled (ESPN 70% / ours 30% per player),
+  // blended 85/15 with the season model. Backtest 2023-2026: log loss 0.661 (season model alone) -> 0.605.
+  const LU=window.LINEUPS, LW=(LU&&LU.y===S.y)?LU.wk:null, lproj={};
+  if(LW!=null) list.forEach(t=>{const r=LU.teams[t.id]; if(r) lproj[t.id]=sum(r.map(x=>.7*(x.espn??x.ours)+.3*x.ours));});
+  const LSD=21.7, LWT=.85;
+  const tm=(t,wk)=>{const m=model[t.id]; if(wk===LW&&lproj[t.id]!=null) return {mu:LWT*lproj[t.id]+(1-LWT)*m.mu, sd:LSD, lu:true}; return {mu:m.mu, sd:Math.sqrt(m.sig**2+m.se**2), lu:false};};
+  const winP=(a,b,wk)=>{const A=tm(a,wk),B=tm(b,wk); return Phi((A.mu-B.mu)/Math.sqrt(A.sd**2+B.sd**2));};
   // simulation
   let seed=20261111; const rnd=()=>{seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296;};
   const norm=()=>{let u=0,v=0; while(!u)u=rnd(); while(!v)v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
@@ -1903,7 +1919,7 @@ function nowModel(){
     MU={}; list.forEach(t=>MU[t.id]=model[t.id].mu+model[t.id].se*norm());
     const W={},PF={}; list.forEach(t=>{W[t.id]=t.w+t.t/2; PF[t.id]=t.pf;});
     const won={};
-    up.forEach(g=>{const a=draw(g.ht.id),b=draw(g.at.id); PF[g.ht.id]+=a; PF[g.at.id]+=b; if(a>b)W[g.ht.id]++; else W[g.at.id]++; if(g.wk===nxW){won[g.ht.id]=a>b; won[g.at.id]=!(a>b);}});
+    up.forEach(g=>{const lu=g.wk===LW&&lproj[g.ht.id]!=null&&lproj[g.at.id]!=null; const a=lu?LWT*lproj[g.ht.id]+(1-LWT)*MU[g.ht.id]+LSD*norm():draw(g.ht.id), b=lu?LWT*lproj[g.at.id]+(1-LWT)*MU[g.at.id]+LSD*norm():draw(g.at.id); PF[g.ht.id]+=a; PF[g.at.id]+=b; if(a>b)W[g.ht.id]++; else W[g.at.id]++; if(g.wk===nxW){won[g.ht.id]=a>b; won[g.at.id]=!(a>b);}});
     const order=list.map(t=>t.id).sort((x,y)=>W[y]-W[x]||PF[y]-PF[x]);
     order.forEach((id,i)=>{if(!(id in won))return; const c=cond[id]; if(won[id]){c.w++; if(i<po)c.wpo++; if(i<2)c.wbye++;} else {c.l++; if(i<po)c.lpo++; if(i<2)c.lbye++;}});
     order.forEach((id,i)=>{const r=res[id]; r.w+=W[id]; r.pf+=PF[id]; r.seed+=i+1; if(i<po)r.po++; if(i<2)r.bye++;});
@@ -1938,7 +1954,7 @@ function nowModel(){
   const rankByWeek=[]; for(let w=1;w<=lastWk;w++){ const W={},PF={}; list.forEach(t=>{W[t.id]=0;PF[t.id]=0;});
     reg.filter(g=>g.wk<=w).forEach(g=>{PF[g.ht.id]+=g.hs; PF[g.at.id]+=g.as; if(g.hs>g.as)W[g.ht.id]++; else if(g.as>g.hs)W[g.at.id]++; else {W[g.ht.id]+=.5;W[g.at.id]+=.5;}});
     const o=list.map(t=>t.id).sort((x,y)=>W[y]-W[x]||PF[y]-PF[x]); rankByWeek.push(Object.fromEntries(o.map((id,i)=>[id,i+1])));}
-  NOWM={S,list,reg,po,G,lastWk,sc,model,up,remaining,winP,res,N,status,sos,pNow,rankByWeek,lgM,cond,nxW};
+  NOWM={S,list,reg,po,G,lastWk,sc,model,up,remaining,winP,tm,LW,res,N,status,sos,pNow,rankByWeek,lgM,cond,nxW};
   return NOWM;
 }
 function vNow(){
@@ -1950,8 +1966,9 @@ function vNow(){
   const stand=list.slice().sort((a,b)=>a.seed-b.seed);
   const pc=x=>{const p=x/N*100; return p>=99.95?'>99.9%':p<=0.05&&x>0?'<0.1%':p===0?'–':f1(p)+'%';};
   // ---- this week's matchups
-  const nextWk=up.length?up[0].wk:null, nextGames=up.filter(g=>g.wk===nextWk);
-  const muCard=g=>{const a=g.ht,b=g.at, pa=winP(a,b), h=C[a.m].h2h[b.m]; const fav=pa>=.5?a:b, fp=Math.max(pa,1-pa);
+  const poNext=(S.poUp||[]).length?Math.min(...S.poUp.map(g=>g.wk)):null;
+  const nextWk=up.length?up[0].wk:poNext, nextGames=up.length?up.filter(g=>g.wk===nextWk):(S.poUp||[]).filter(g=>g.wk===poNext), isPO=!up.length&&poNext!=null;
+  const muCard=g=>{const a=g.ht,b=g.at, pa=winP(a,b,g.wk), h=C[a.m].h2h[b.m]; const fav=pa>=.5?a:b, fp=Math.max(pa,1-pa);
     let hist='First meeting'; if(h&&h.n){const lead=h.w>h.l?`${M[a.m].short} leads ${h.w}-${h.l}${h.t?'-'+h.t:''}`:h.l>h.w?`${M[b.m].short} leads ${h.l}-${h.w}${h.t?'-'+h.t:''}`:`Tied ${h.w}-${h.l}`; const L=h.list[h.list.length-1]; const lw=L.r==='W'?a.m:b.m;
       hist=`${lead} all-time · last met ${L.y} Wk ${L.wk}, ${esc(M[lw].short)} won ${f2(Math.max(L.ms,L.os))}-${f2(Math.min(L.ms,L.os))}`;}
     const side=(t,p)=>`<div class="mu-side"><div>${tm(t)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG · form ${form(t)||'–'}</div><div class="mu-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div></div>`;
@@ -2034,8 +2051,8 @@ function vNow(){
   <div class="head"><div><h2>${CUR} Season</h2><p class="lede">Through Week ${lastWk} of ${G}. ${esc(M[stand[0].m].short)} leads at ${rec(stand[0].w,stand[0].l,stand[0].t)}. ${G-lastWk>0?`${G-lastWk} week${G-lastWk>1?'s':''} left before the ${po}-team playoff.`:'Regular season is done.'}</p></div><a class="chip" href="#season-${CUR}">Every week's results</a></div>
   ${liveBracket()}
   ${recapCard()}
-  ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} Matchups</h3><span class="sub">Win chances from each team's ${CUR} scoring</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
-  <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule. Each team's strength comes from this season's scoring (recent weeks count more), pulled slightly toward last season early on, with room for uncertainty. Tested against every season since 2015. Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
+  ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} ${isPO?'Playoff ':''}Matchups</h3><span class="sub">${NM.LW===nextWk?'Win chances from this week\'s lineups and '+CUR+' scoring':'Win chances from each team\'s '+CUR+' scoring'}</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
+  <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule. Each team's strength comes from this season's scoring (recent weeks count more), pulled slightly toward last season early on, with room for uncertainty. Tested against every season since 2015.${NM.LW!=null?` Week ${NM.LW} uses this week's starting lineups.`:''} Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
   <div class="grid2">
     <div class="card"><h3>Standings</h3><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">PF</th><th class="r">PA</th><th class="r">Strk</th></tr></thead><tbody>${standRows}</tbody></table></div><p class="note">Dashed line marks the playoff cut (top ${po}).</p></div>
     <div class="card"><h3>Power Rankings</h3><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="r">Move</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">All-Play</th><th class="r">Last 3</th></tr></thead><tbody>${prRows}</tbody></table></div><p class="note">Blends record, All-Play and the last three weeks of scoring. Movement is since Week ${Math.max(1,lastWk-1)}.</p></div>
@@ -2070,23 +2087,48 @@ function wireHeader(){
   window.addEventListener('hashchange',()=>{hdr.classList.remove('s-open'); btn.setAttribute('aria-expanded','false'); const on=document.querySelector('#tabs a.on'); if(on&&on.scrollIntoView) on.scrollIntoView({block:'nearest',inline:'center'});});
 }
 // ----- playoff bracket for the live season (after the regular season ends) -----
-function liveBracket(){
-  const S=curS; if(S.complete||S.po!==6) return '';
-  const regDone=!(S.upcoming||[]).length&&S.games.filter(g=>!g.po).reduce((m,g)=>Math.max(m,g.wk),0)>=S.reg; if(!regDone) return '';
-  const seeds=S.list.filter(t=>t.seed<=6).sort((a,b)=>a.seed-b.seed), sd=n=>seeds[n-1];
+function bracketState(){
+  const S=curS; if(S.complete||S.po!==6) return null;
+  const regDone=!(S.upcoming||[]).length&&S.games.filter(g=>!g.po).reduce((m,g)=>Math.max(m,g.wk),0)>=S.reg; if(!regDone) return null;
+  const seeds=S.list.filter(t=>t.seed<=6).sort((a,b)=>a.seed-b.seed); if(seeds.length<6) return null; const sd=n=>seeds[n-1];
   const po=S.games.filter(g=>g.po), find=(a,b)=>a&&b?po.find(g=>(g.ht===a&&g.at===b)||(g.ht===b&&g.at===a)):null;
   const winner=g=>g?(g.hs>g.as?g.ht:g.at):null;
-  const q1=find(sd(4),sd(5)), q2=find(sd(3),sd(6));
-  const s1a=sd(1), s1b=winner(q1), s2a=sd(2), s2b=winner(q2);
-  const s1=find(s1a,s1b), s2=find(s2a,s2b);
-  const fa=winner(s1), fb=winner(s2), fin=find(fa,fb);
-  const box=(a,b,g,isF)=>{const row=t=>{ if(!t) return `<div><span class="sd"></span><span class="tn sub">TBD</span><span></span></div>`; const s=g?(g.ht===t?g.hs:g.as):null, w=g&&winner(g)===t;
-      return `<div class="${w?'w':''}"><span class="sd">${t.seed}</span><span class="tn">${esc(t.n)}<span class="sub">${esc(M[t.m].short)}</span></span><span class="num sc">${s!=null?f2(s):''}</span>${w&&isF?'<span class="pill p-champ">Champion</span>':''}</div>`;};
-    return `<div class="match2 ${isF?'final':''}">${row(a)}${row(b)}</div>`;};
+  const q1=find(sd(4),sd(5)), q2=find(sd(3),sd(6)), s1a=sd(1), s1b=winner(q1), s2a=sd(2), s2b=winner(q2), s1=find(s1a,s1b), s2=find(s2a,s2b), fa=winner(s1), fb=winner(s2), fin=find(fa,fb);
+  return {S,seeds,sd,q1,q2,s1,s2,fin,s1a,s1b,s2a,s2b,fa,fb,winner,wks:[S.reg+1,S.reg+2,S.reg+3]};
+}
+let BSIM=null;
+function bracketSim(){
+  if(BSIM) return BSIM; const B=bracketState(); if(!B) return null; const NM=nowModel(), {tm}=NM, sd=B.sd;
+  let seed=4242; const rnd=()=>{seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296;};
+  const norm=()=>{let u=0,v=0; while(!u)u=rnd(); while(!v)v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  const N=20000, res={}; B.seeds.forEach(t=>res[t.id]={final:0,title:0,semi:0});
+  // the next game each team still has to play, and conditional title odds on winning it
+  const cond={}; B.seeds.forEach(t=>cond[t.id]={w:0,wt:0,l:0,lt:0});
+  for(let k=0;k<N;k++){ const first={};
+    const play=(a,b,g,wk)=>{ if(g) return B.winner(g); const A=tm(a,wk),Bb=tm(b,wk); const w=(A.mu+A.sd*norm())>(Bb.mu+Bb.sd*norm())?a:b; if(!(a.id in first)) first[a.id]=w===a; if(!(b.id in first)) first[b.id]=w===b; return w; };
+    const w1=play(sd(4),sd(5),B.q1,B.wks[0]), w2=play(sd(3),sd(6),B.q2,B.wks[0]);
+    [sd(1),sd(2),w1,w2].forEach(t=>res[t.id].semi++);
+    const f1=play(sd(1),w1,B.s1,B.wks[1]), f2=play(sd(2),w2,B.s2,B.wks[1]);
+    res[f1.id].final++; res[f2.id].final++;
+    const ch=play(f1,f2,B.fin,B.wks[2]); res[ch.id].title++;
+    Object.entries(first).forEach(([id,won])=>{const c=cond[id]; if(won){c.w++; if(+id===ch.id)c.wt++;} else {c.l++;}});
+  }
+  BSIM={N,res,cond,B}; return BSIM;
+}
+function liveBracket(){
+  const B=bracketState(); if(!B) return '';
+  const {sd,q1,q2,s1,s2,fin,s1a,s1b,s2a,s2b,fa,fb,winner,wks}=B, NM=nowModel(), BS=bracketSim();
+  const box=(a,b,g,wk,isF)=>{const pa=!g&&a&&b?NM.winP(a,b,wk):null;
+    const row=(t,p)=>{ if(!t) return `<div><span class="sd"></span><span class="tn sub">TBD</span><span></span></div>`; const s=g?(g.ht===t?g.hs:g.as):null, w=g&&winner(g)===t;
+      return `<div class="${w?'w':''}"><span class="sd">${t.seed}</span><span class="tn">${esc(t.n)}<span class="sub">${esc(M[t.m].short)}</span></span><span class="num sc">${s!=null?f2(s):p!=null?`<span class="${p>=.5?'better':'sub'}">${f0(p*100)}%</span>`:''}</span>${w&&isF?'<span class="pill p-champ">Champion</span>':''}</div>`;};
+    return `<div class="match2 ${isF?'final':''}">${row(a,pa)}${row(b,pa==null?null:1-pa)}${pa!=null?`<a class="bk-link" href="#matchup-${a.id}-${b.id}">Matchup preview ›</a>`:''}</div>`;};
+  const odds=BS?B.seeds.slice().sort((x,y)=>BS.res[y.id].title-BS.res[x.id].title).map(t=>{const r=BS.res[t.id], p=r.title/BS.N;
+    return `<div class="tile"><div class="k">${t.seed} · ${esc(M[t.m].short)}</div><div class="v num">${p>=.9995?'Champ':p<=0?'Out':f0(p*100)+'%'}</div><div class="sub">final ${f0(r.final/BS.N*100)}%</div></div>`;}).join(''):'';
   return `<div class="card"><div class="head" style="margin-bottom:12px"><h3>${CUR} Playoff Bracket</h3><span class="sub">Byes: ${esc(sd(1).n)} (1), ${esc(sd(2).n)} (2)</span></div><div class="bracket2">
-    <div class="round2"><h4>Quarterfinals<span class="sub"> · Week ${S.reg+1}</span></h4>${box(sd(4),sd(5),q1)}${box(sd(3),sd(6),q2)}</div>
-    <div class="round2"><h4>Semifinals<span class="sub"> · Week ${S.reg+2}</span></h4>${box(s1a,s1b,s1)}${box(s2a,s2b,s2)}</div>
-    <div class="round2"><h4>Championship<span class="sub"> · Week ${S.reg+3}</span></h4>${box(fa,fb,fin,true)}</div></div></div>`;
+    <div class="round2"><h4>Quarterfinals<span class="sub"> · Week ${wks[0]}</span></h4>${box(sd(4),sd(5),q1,wks[0])}${box(sd(3),sd(6),q2,wks[0])}</div>
+    <div class="round2"><h4>Semifinals<span class="sub"> · Week ${wks[1]}</span></h4>${box(s1a,s1b,s1,wks[1])}${box(s2a,s2b,s2,wks[1])}</div>
+    <div class="round2"><h4>Championship<span class="sub"> · Week ${wks[2]}</span></h4>${box(fa,fb,fin,wks[2],true)}</div></div>
+    ${odds&&!fin?`<div class="mx-lbl">Title odds</div><div class="tiles">${odds}</div><p class="note">${BS.N.toLocaleString()} simulations of the rest of the bracket${NM.LW!=null&&[[q1,0],[q2,0],[s1,1],[s2,1],[fin,2]].some(x=>!x[0]&&wks[x[1]]===NM.LW)?`, using this week's lineups for Week ${NM.LW}`:''}.</p>`:''}</div>`;
 }
 // ---------- router ----------
 function route(){
@@ -2131,12 +2173,12 @@ function wire(){
 }
 document.getElementById('tab-now').textContent=CUR+' Season';
 renderFooter();
-window.ROUTE=route;
+window.ROUTE=route; window.RESETNOW=()=>{NOWM=null; BSIM=null;};
 window.addEventListener('hashchange',()=>{route(); window.scrollTo(0,0);});
 route();
 };
 window.LINEUPS=null;
-fetch("data/lineups.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{window.LINEUPS=j; if(j&&window.ROUTE&&location.hash.startsWith('#matchup')){const y=window.scrollY; window.ROUTE(); window.scrollTo(0,y);}}).catch(()=>{});
+fetch("data/lineups.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{window.LINEUPS=j; if(j&&window.ROUTE&&(location.hash.startsWith('#matchup')||location.hash==='#now')){window.RESETNOW&&window.RESETNOW(); const y=window.scrollY; window.ROUTE(); window.scrollTo(0,y);}}).catch(()=>{});
 fetch("data/league.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error(r.status);window.__LM=r.headers.get("last-modified");return r.json();}).then(d=>{try{window.BOOT(d); window.BOOTED=true;}catch(err){console.error(err);document.getElementById("app").innerHTML=`<div class="card"><h3>Something went wrong showing this page</h3><p class="note">${err.message}. Try another tab, or reload.</p></div>`;}}).catch(e=>{document.getElementById("app").innerHTML=`<div class="card"><h3>Could not load league data</h3><p class="note">data/league.json failed to load (${e.message}). If you opened this file directly from your computer, serve the folder instead, for example: python3 -m http.server</p></div>`;});
 </script>
 </body>

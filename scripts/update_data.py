@@ -96,9 +96,8 @@ def main():
             if not a.get("teamId") or not h.get("teamId") or tier not in ("NONE", "WINNERS_BRACKET"):
                 continue
             if m.get("winner") == "UNDECIDED":
-                # upcoming or in-progress regular season game: keep the pairing, not the partial score
-                if tier == "NONE":
-                    games.append(",".join(str(v) for v in [m["matchupPeriodId"], h["teamId"], 0, a["teamId"], 0, "U"]))
+                # upcoming or in-progress game: keep the pairing, not the partial score (Q = playoff)
+                games.append(",".join(str(v) for v in [m["matchupPeriodId"], h["teamId"], 0, a["teamId"], 0, "U" if tier == "NONE" else "Q"]))
                 continue
             games.append(",".join(str(v) for v in [m["matchupPeriodId"], h["teamId"], num(r2(h.get("totalPoints"))),
                                                     a["teamId"], num(r2(a.get("totalPoints"))), "R" if tier == "NONE" else "P"]))
