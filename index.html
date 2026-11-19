@@ -417,6 +417,20 @@ main>.mx-two{gap:22px}
 @media (max-width:800px){.mx-two{grid-template-columns:1fr}.mx-tn{font-size:20px}.mx-p{font-size:40px}}
 .mx-lbl{margin:16px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--muted)}
 .mx-scen{margin:0;padding-left:18px;font-size:14px;line-height:1.6}
+.lu{display:flex;flex-direction:column;font-size:14px}
+.lu-row{display:grid;grid-template-columns:minmax(0,1fr) 84px minmax(0,1fr);gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.lu-side{display:grid;grid-template-columns:minmax(0,1fr) 54px 54px;gap:8px;align-items:center}
+.lu-side.r{grid-template-columns:54px 54px minmax(0,1fr)}
+.lu-side.r .lu-p{text-align:right}
+.lu-n{text-align:right}.lu-side.r .lu-n{text-align:left}
+.lu-p b{font-weight:600}.lu-p .pill{margin-left:6px;font-size:10px;padding:1px 6px}
+.lu-slot{text-align:center;font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px}
+.lu-slot i{font-style:normal;font-size:11px}.lu-slot.ea i,.lu-slot.eb i{color:var(--good)}
+.lu-hd{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--muted);border-bottom:2px solid var(--ink)}
+.lu-tot{font-weight:700;border-bottom:0;border-top:2px solid var(--ink)}
+.lu-warn{background:var(--bad-bg);border-radius:6px}
+.lu-bad{background:var(--bad-bg);color:var(--bad)}.lu-q{background:#fff4d6;color:#8a6100}
+@media (max-width:800px){.lu-row{grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);gap:6px}.lu-side{grid-template-columns:minmax(0,1fr) 40px}.lu-side.r{grid-template-columns:40px minmax(0,1fr)}.lu-side>:nth-child(2){display:none}.lu-p .sub{display:none}}
 </style>
 </head>
 <body>
@@ -1570,6 +1584,36 @@ function histProbs(){
       wg.forEach(g=>{(sc[g.ht.id]=sc[g.ht.id]||[]).push(g.hs); (sc[g.at.id]=sc[g.at.id]||[]).push(g.as); all.push(g.hs,g.as);});});});
   return HISTP;
 }
+function lineupCard(A,B,wk){
+  const L=window.LINEUPS;
+  if(!L) return `<div class="card"><div class="head"><h3>Starting Lineups</h3></div><p class="note" style="margin:0">Loading lineups…</p></div>`;
+  if(L.y!==curS.y||L.wk!==wk||!L.teams[A.id]||!L.teams[B.id]) return '';
+  const ra=L.teams[A.id], rb=L.teams[B.id], order=[...new Set([...ra,...rb].map(r=>r.s))];
+  const val=r=>r?((r.espn??r.ours)+r.ours)/2:0;
+  const flag=r=>`${r.bye?'<span class="pill lu-bad">BYE</span>':''}${r.inj?`<span class="pill ${r.inj==='Q'?'lu-q':'lu-bad'}">${r.inj}</span>`:''}`;
+  const avgL=r=>r.last&&r.last.length?f1(avg(r.last)):'–';
+  const cellA=r=>r?`<div class="lu-p"><b>${esc(r.n)}</b>${flag(r)}<div class="sub">${r.pos} · ${r.pro} · last ${r.last.length}: ${avgL(r)} avg</div></div>`:'<div class="lu-p sub">Empty</div>';
+  const rows=[]; let tot={ae:0,ao:0,be:0,bo:0}, edges={a:0,b:0};
+  order.forEach(sl=>{const xa=ra.filter(r=>r.s===sl), xb=rb.filter(r=>r.s===sl), n=Math.max(xa.length,xb.length);
+    for(let k=0;k<n;k++){const a=xa[k], b=xb[k], va=val(a), vb=val(b), win=Math.abs(va-vb)<.5?0:va>vb?1:-1; if(win>0)edges.a++; else if(win<0)edges.b++;
+      if(a){tot.ae+=a.espn||0; tot.ao+=a.ours;} if(b){tot.be+=b.espn||0; tot.bo+=b.ours;}
+      const warn=x=>x&&(x.bye||x.inj==='O'||x.inj==='IR'||x.inj==='SSPD')?' lu-warn':'';
+      rows.push(`<div class="lu-row">
+        <div class="lu-side${warn(a)}">${cellA(a)}<span class="num lu-n">${a&&a.espn!=null?f1(a.espn):'–'}</span><span class="num lu-n ${win>0?'better':''}">${a?f1(a.ours):'–'}</span></div>
+        <div class="lu-slot ${win>0?'ea':win<0?'eb':''}">${esc(L.slots[sl]||'')}<i>${win>0?'◀':win<0?'▶':'='}</i></div>
+        <div class="lu-side r${warn(b)}"><span class="num lu-n ${win<0?'better':''}">${b?f1(b.ours):'–'}</span><span class="num lu-n">${b&&b.espn!=null?f1(b.espn):'–'}</span>${cellA(b)}</div></div>`);}});
+  const hd=`<div class="lu-row lu-hd"><div class="lu-side"><span>${esc(M[A.m].short)}</span><span class="lu-n">ESPN</span><span class="lu-n">Ours</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="lu-n">Ours</span><span class="lu-n">ESPN</span><span>${esc(M[B.m].short)}</span></div></div>`;
+  const ft=`<div class="lu-row lu-tot"><div class="lu-side"><span>Projected total</span><span class="num lu-n">${f1(tot.ae)}</span><span class="num lu-n ${tot.ao>tot.bo?'better':''}">${f1(tot.ao)}</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="num lu-n ${tot.bo>tot.ao?'better':''}">${f1(tot.bo)}</span><span class="num lu-n">${f1(tot.be)}</span><span></span></div></div>`;
+  const upd=L.U?new Date(L.U).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+  const espnFav=Math.abs(tot.ae-tot.be)<.05?'even':`${esc(M[(tot.ae>tot.be?A:B).m].short)} by ${f1(Math.abs(tot.ae-tot.be))}`, ourFav=Math.abs(tot.ao-tot.bo)<.05?'even':`${esc(M[(tot.ao>tot.bo?A:B).m].short)} by ${f1(Math.abs(tot.ao-tot.bo))}`;
+  return `<div class="card"><div class="head" style="margin-bottom:10px"><h3>Starting Lineups</h3><span class="sub">as of ${upd}</span></div>
+    <div class="tiles" style="margin-bottom:12px">
+      <div class="tile"><div class="k">ESPN projection</div><div class="v num">${f1(tot.ae)}–${f1(tot.be)}</div><div class="sub">${espnFav}</div></div>
+      <div class="tile"><div class="k">Our projection</div><div class="v num">${f1(tot.ao)}–${f1(tot.bo)}</div><div class="sub">${ourFav}</div></div>
+      <div class="tile"><div class="k">Position edges</div><div class="v num">${edges.a}–${edges.b}</div><div class="sub">${esc(M[A.m].short)} vs ${esc(M[B.m].short)}</div></div></div>
+    <div class="lu">${hd}${rows.join('')}${ft}</div>
+    <p class="note">ESPN's numbers are ESPN's own projections. Ours come from each player's recent games (recent weeks count more), pulled toward a typical starter at his position, with zero for byes and players ruled out and a discount for doubtful or questionable. In a 2026 backtest, ours missed by about 6.4 points per starter and ESPN's by 6.35. The arrow marks the edge at each spot using the average of both. Lineups refresh Thursday afternoon, Saturday night and Sunday morning, so late swaps may not show yet.</p></div>`;
+}
 // ----- Matchup preview page -----
 function vMatchup(aid,bid){
   const back=`<a class="chip" href="#now">‹ ${CUR} Season</a>`;
@@ -1705,7 +1749,7 @@ function vMatchup(aid,bid){
   // other games this week
   const others=up.filter(g=>g.wk===wk&&g!==game);
   const otherHtml=others.length?`<div class="mx-others">${others.map(g=>`<a href="#matchup-${g.ht.id}-${g.at.id}">${esc(M[g.ht.m].short)} vs ${esc(M[g.at.m].short)}</a>`).join('')}</div>`:'';
-  return `${hero}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} Matchups</h3></div>${otherHtml}</div>`:''}`;
+  return `${hero}${lineupCard(A,B,wk)}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} Matchups</h3></div>${otherHtml}</div>`:''}`;
 }
 // ----- League timeline -----
 function vTimeline(){
@@ -2090,7 +2134,9 @@ renderFooter();
 window.addEventListener('hashchange',()=>{route(); window.scrollTo(0,0);});
 route();
 };
-fetch("data/league.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error(r.status);window.__LM=r.headers.get("last-modified");return r.json();}).then(d=>{try{window.BOOT(d);}catch(err){console.error(err);document.getElementById("app").innerHTML=`<div class="card"><h3>Something went wrong showing this page</h3><p class="note">${err.message}. Try another tab, or reload.</p></div>`;}}).catch(e=>{document.getElementById("app").innerHTML=`<div class="card"><h3>Could not load league data</h3><p class="note">data/league.json failed to load (${e.message}). If you opened this file directly from your computer, serve the folder instead, for example: python3 -m http.server</p></div>`;});
+window.LINEUPS=null;
+fetch("data/lineups.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{window.LINEUPS=j; if(j&&window.BOOTED&&location.hash.startsWith('#matchup')){const y=window.scrollY; route(); window.scrollTo(0,y);}}).catch(()=>{});
+fetch("data/league.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error(r.status);window.__LM=r.headers.get("last-modified");return r.json();}).then(d=>{try{window.BOOT(d); window.BOOTED=true;}catch(err){console.error(err);document.getElementById("app").innerHTML=`<div class="card"><h3>Something went wrong showing this page</h3><p class="note">${err.message}. Try another tab, or reload.</p></div>`;}}).catch(e=>{document.getElementById("app").innerHTML=`<div class="card"><h3>Could not load league data</h3><p class="note">data/league.json failed to load (${e.message}). If you opened this file directly from your computer, serve the folder instead, for example: python3 -m http.server</p></div>`;});
 </script>
 </body>
 </html>

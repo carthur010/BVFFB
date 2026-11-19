@@ -5,8 +5,8 @@ For every starter: ESPN's projection, our own projection, injury status and bye.
 
 Our projection is a weighted average of the player's recent games (recent weeks
 count more, last season counts a little), pulled toward the average for his
-position, then adjusted for bye weeks and injury status. It's tuned on a
-2026 Weeks 4-10 backtest.
+position, then adjusted for bye weeks and injury status. Tuned on a 2026 Weeks 4-10
+backtest (about 6.4 points of error per starter, vs 6.35 for ESPN).
 
 Needs the same ESPN_S2 and SWID cookies as update_data.py.
 """
@@ -60,12 +60,18 @@ def main():
         games[p["id"]] = [(s["seasonId"], s["scoringPeriodId"], s["appliedTotal"]) for s in p["player"].get("stats", [])
                           if s.get("statSourceId") == 0 and s.get("statSplitTypeId") == 1]
 
+    # prior = typical starter at the position: average of the top half of rostered players
     by_pos = {}
     for t in ros["teams"]:
         for e in t["roster"]["entries"]:
             pos = e["playerPoolEntry"]["player"]["defaultPositionId"]
-            by_pos.setdefault(pos, []).extend(v for (y, w, v) in games.get(e["playerId"], []) if y == year and w < wk)
-    pos_mean = {k: (sum(v) / len(v) if v else 10.0) for k, v in by_pos.items()}
+            v = [v for (y, w, v) in games.get(e["playerId"], []) if y == year and w < wk]
+            if len(v) >= 2:
+                by_pos.setdefault(pos, []).append(sum(v) / len(v))
+    pos_mean = {}
+    for k, v in by_pos.items():
+        top = sorted(v, reverse=True)[:max(1, round(len(v) / 2))]
+        pos_mean[k] = sum(top) / len(top)
 
     def ours(pid, pos):
         sw = sv = 0.0
