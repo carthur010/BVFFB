@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Pull this week's starting lineups from ESPN and write data/lineups.json.
+
+For every starter: ESPN's projection, our own projection, injury status and bye.
+
+Our projection is a weighted average of the player's recent games (recent weeks
+count more, last season counts a little), pulled toward the average for his
+position, then adjusted for bye weeks and injury status. It's tuned on a
+2026 Weeks 4-10 backtest.
+
+Needs the same ESPN_S2 and SWID cookies as update_data.py.
+"""
+import datetime, json, os, sys, urllib.request
+from pathlib import Path
+
+LEAGUE_ID = int(os.environ.get("LEAGUE_ID", "1068706"))
+OUT = Path(__file__).resolve().parent.parent / "data" / "lineups.json"
+BASE = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl"
+
+POS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "D/ST"}
+SLOT = {0: "QB", 2: "RB", 3: "RB/WR", 4: "WR", 5: "WR", 6: "TE", 7: "OP", 16: "D/ST", 17: "K", 23: "FLEX"}
+SLOT_ORDER = [0, 2, 3, 4, 5, 6, 23, 7, 16, 17]
+BENCH = {20, 21}
+INJ = {"OUT": 0.0, "INJURY_RESERVE": 0.0, "SUSPENSION": 0.0, "DOUBTFUL": 0.25, "QUESTIONABLE": 0.85}
+INJ_SHORT = {"OUT": "O", "INJURY_RESERVE": "IR", "SUSPENSION": "SSPD", "DOUBTFUL": "D", "QUESTIONABLE": "Q"}
+DECAY, LAST_SEASON, PRIOR = 0.9, 0.7, 3.0
+
+
+def get(url, filt=None):
+    cookie = f"espn_s2={os.environ['ESPN_S2']}; SWID={os.environ['SWID']}"
+    h = {"Cookie": cookie, "User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+    if filt:
+        h["x-fantasy-filter"] = json.dumps(filt)
+    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60) as r:
+        return json.loads(r.read().decode())
+
+
+def main():
+    for k in ("ESPN_S2", "SWID"):
+        if not os.environ.get(k):
+            sys.exit(f"Missing {k}.")
+    today = datetime.date.today()
+    year = int(os.environ.get("SEASON") or (today.year if today.month >= 8 else today.year - 1))
+    lg = f"{BASE}/seasons/{year}/segments/0/leagues/{LEAGUE_ID}"
+    settings = get(f"{lg}?view=mSettings")
+    wk = settings.get("scoringPeriodId") or settings["status"]["currentMatchupPeriod"]
+    final = settings["settings"]["scheduleSettings"].get("matchupPeriodCount", 14) + 4
+    if settings["status"].get("isActive") is False or wk > final:
+        print("Season not active; leaving lineups as they are.")
+        return
+
+    ros = get(f"{lg}?view=mRoster&view=mMatchup&scoringPeriodId={wk}")
+    pro = {p["id"]: p for p in get(f"{BASE}/seasons/{year}?view=proTeamSchedules_wl")["settings"]["proTeams"]}
+
+    ids = [e["playerId"] for t in ros["teams"] for e in t["roster"]["entries"]]
+    hist = get(f"{lg}?view=kona_player_info", {"players": {"filterIds": {"value": ids},
+               "filterStatsForTopScoringPeriodIds": {"value": 17, "additionalValue": [f"00{year}", f"10{year}"]}}})
+    games = {}
+    for p in hist["players"]:
+        games[p["id"]] = [(s["seasonId"], s["scoringPeriodId"], s["appliedTotal"]) for s in p["player"].get("stats", [])
+                          if s.get("statSourceId") == 0 and s.get("statSplitTypeId") == 1]
+
+    by_pos = {}
+    for t in ros["teams"]:
+        for e in t["roster"]["entries"]:
+            pos = e["playerPoolEntry"]["player"]["defaultPositionId"]
+            by_pos.setdefault(pos, []).extend(v for (y, w, v) in games.get(e["playerId"], []) if y == year and w < wk)
+    pos_mean = {k: (sum(v) / len(v) if v else 10.0) for k, v in by_pos.items()}
+
+    def ours(pid, pos):
+        sw = sv = 0.0
+        for (y, w, v) in games.get(pid, []):
+            if y == year and w >= wk:
+                continue
+            age = (wk - w) if y == year else (wk + 18 - w)
+            wt = DECAY ** age * (LAST_SEASON if y != year else 1.0)
+            sw += wt
+            sv += wt * v
+        return (sv + PRIOR * pos_mean.get(pos, 10.0)) / (sw + PRIOR)
+
+    uses_te_in_wr = any(e["lineupSlotId"] == 5 and e["playerPoolEntry"]["player"]["defaultPositionId"] == 4
+                        for t in ros["teams"] for e in t["roster"]["entries"])
+    out_teams = {}
+    for t in ros["teams"]:
+        rows = []
+        for e in t["roster"]["entries"]:
+            slot = e["lineupSlotId"]
+            if slot in BENCH:
+                continue
+            pl = e["playerPoolEntry"]["player"]
+            pos = pl["defaultPositionId"]
+            pt = pro.get(pl.get("proTeamId"), {})
+            bye = pt.get("byeWeek") == wk
+            inj = pl.get("injuryStatus") or e.get("injuryStatus")
+            espn = next((s["appliedTotal"] for s in pl.get("stats", [])
+                         if s.get("scoringPeriodId") == wk and s.get("statSourceId") == 1 and s.get("statSplitTypeId") == 1), None)
+            mine = 0.0 if bye else ours(e["playerId"], pos) * INJ.get(inj, 1.0)
+            last = [round(v, 1) for (y, w, v) in sorted(games.get(e["playerId"], []), key=lambda g: (g[0], g[1]))
+                    if y == year and w < wk][-5:]
+            rows.append({
+                "s": slot,
+                "n": pl["fullName"],
+                "pos": POS.get(pos, "?"),
+                "pro": pt.get("abbrev", "FA"),
+                "inj": INJ_SHORT.get(inj),
+                "bye": bye or None,
+                "espn": None if espn is None else round(espn, 1),
+                "ours": round(mine, 1),
+                "last": last,
+            })
+        rows.sort(key=lambda r: (SLOT_ORDER.index(r["s"]) if r["s"] in SLOT_ORDER else 99, -(r["espn"] or 0)))
+        out_teams[str(t["id"])] = rows
+
+    slot_names = dict(SLOT)
+    if uses_te_in_wr:
+        slot_names[5] = "WR/TE"
+    new = {"y": year, "wk": wk, "slots": {str(k): v for k, v in slot_names.items()}, "teams": out_teams}
+    old = json.loads(OUT.read_text()) if OUT.exists() else {}
+    new["U"] = old.get("U") if {k: v for k, v in old.items() if k != "U"} == new else \
+        datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    OUT.write_text(json.dumps(new, separators=(",", ":")))
+    print(f"Week {wk}: {sum(len(v) for v in out_teams.values())} starters written.")
+
+
+if __name__ == "__main__":
+    main()

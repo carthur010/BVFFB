@@ -4,6 +4,10 @@ on:
   schedule:
     # Tuesdays and Wednesdays at 11:17 UTC (early morning ET), after Monday Night Football is final
     - cron: "17 11 * * 2,3"
+    # Lineup refreshes: Thursday afternoon, Saturday night, Sunday morning (ET)
+    - cron: "17 20 * * 4"
+    - cron: "17 1 * * 0"
+    - cron: "17 15 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -22,14 +26,20 @@ jobs:
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
         run: python3 scripts/update_data.py
+      - name: Pull this week's starting lineups
+        env:
+          ESPN_S2: ${{ secrets.ESPN_S2 }}
+          SWID: ${{ secrets.SWID }}
+        run: python3 scripts/update_lineups.py
       - name: Commit if anything changed
         run: |
-          if git diff --quiet data/league.json; then
+          git add -N data/lineups.json 2>/dev/null || true
+          if git diff --quiet data/; then
             echo "No new results."
           else
             git config user.name "bvffb-bot"
             git config user.email "bvffb-bot@users.noreply.github.com"
-            git add data/league.json
+            git add data/
             git commit -m "Refresh league data $(date -u +%Y-%m-%d)"
             git push
           fi
