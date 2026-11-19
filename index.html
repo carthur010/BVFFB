@@ -1706,7 +1706,7 @@ function vNow(){
     {k:'seed',label:'#',r:1,asc:1,f:r=>r.t.seed,sv:r=>r.t.seed},
     {k:'team',label:'Team',pin:1,f:r=>tm(r.t),sv:r=>r.t.n,asc:1},
     {k:'rec',label:'Now',r:1,f:r=>rec(r.t.w,r.t.l,r.t.t),sv:r=>r.t.w},
-    {k:'ew',label:'Proj.',r:1,f:r=>`${f1(r.ew)}-${f1(r.el)}`},
+    {k:'ew',label:'Proj.',r:1,f:r=>{const w=Math.round(r.ew); return `${w}-${Math.round(r.ew+r.el)-w}`;}},
     {k:'po',label:'Playoffs',r:1,f:r=>`<b>${pc(r.po)}</b>`},
     {k:'bye',label:'Bye',r:1,f:r=>pc(r.bye)},
     {k:'final',label:'Final',r:1,f:r=>pc(r.final)},
