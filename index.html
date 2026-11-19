@@ -2136,7 +2136,6 @@ function vNow(){
   <div class="head"><div><h2>${CUR} Season</h2><p class="lede">Through Week ${lastWk} of ${G}. ${esc(M[stand[0].m].short)} leads at ${rec(stand[0].w,stand[0].l,stand[0].t)}. ${G-lastWk>0?`${G-lastWk} week${G-lastWk>1?'s':''} left before the ${po}-team playoff.`:'Regular season is done.'}</p></div><a class="chip" href="#season-${CUR}">Every week's results</a></div>
   ${liveBracket()}
   ${recapCard()}
-  ${scorecard()}
   ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} ${isPO?'Playoff ':''}Matchups</h3><span class="sub">${NM.LW===nextWk?'Win chances from this week\'s lineups and '+CUR+' scoring':'Win chances from each team\'s '+CUR+' scoring'}</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
   ${nextWk?lineupAlerts(nextWk):''}
   <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule. Each team's strength comes from this season's scoring (recent weeks count more), pulled slightly toward last season early on, with room for uncertainty. Tested against every season since 2015.${NM.LW!=null?` Week ${NM.LW} uses this week's starting lineups.`:''} Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
@@ -2156,7 +2155,8 @@ function vNow(){
     <div class="card"><h3>Heating Up</h3><div class="rec-list">${hot.map(c=>sRow(c,'pos')).join('')||'<p class="note">Nobody on a win streak.</p>'}</div></div>
     <div class="card"><h3>Ice Cold</h3><div class="rec-list">${cold.map(c=>sRow(c,'neg')).join('')||'<p class="note">Nobody on a skid.</p>'}</div></div>
     <div class="card"><h3>Luck Meter</h3><div class="rec-list">${luck.slice(0,2).map(lk).join('')}${luck.slice(-2).map(lk).join('')}</div><p class="note">Wins above or below what All-Play scoring predicts. Two luckiest, two unluckiest.</p></div>
-  </div>`;
+  </div>
+  ${scorecard()}`;
 }
 
 // ----- footer -----
