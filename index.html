@@ -1616,9 +1616,9 @@ function lineupCard(A,B,wk){
   const espnFav=Math.abs(tot.ae-tot.be)<.05?'even':`${esc(M[(tot.ae>tot.be?A:B).m].short)} by ${f1(Math.abs(tot.ae-tot.be))}`, ourFav=Math.abs(tot.ao-tot.bo)<.05?'even':`${esc(M[(tot.ao>tot.bo?A:B).m].short)} by ${f1(Math.abs(tot.ao-tot.bo))}`;
   return `<div class="card"><div class="head" style="margin-bottom:10px"><h3>Starting Lineups</h3><span class="sub">as of ${upd}</span></div>
     <div class="tiles" style="margin-bottom:12px">
-      <div class="tile"><div class="k">ESPN projection</div><div class="v num">${f1(tot.ae)}–${f1(tot.be)}</div><div class="sub">${espnFav}</div></div>
-      <div class="tile"><div class="k">Our projection</div><div class="v num">${f1(tot.ao)}–${f1(tot.bo)}</div><div class="sub">${ourFav}</div></div>
-      <div class="tile"><div class="k">Position edges</div><div class="v num">${edges.a}–${edges.b}</div><div class="sub">${esc(M[A.m].short)} vs ${esc(M[B.m].short)}</div></div></div>
+      <div class="tile"><div class="k">ESPN projection</div><div class="v num">${f1(Math.max(tot.ae,tot.be))}–${f1(Math.min(tot.ae,tot.be))}</div><div class="sub">${espnFav}</div></div>
+      <div class="tile"><div class="k">Our projection</div><div class="v num">${f1(Math.max(tot.ao,tot.bo))}–${f1(Math.min(tot.ao,tot.bo))}</div><div class="sub">${ourFav}</div></div>
+      <div class="tile"><div class="k">Position edges</div><div class="v num">${Math.max(edges.a,edges.b)}–${Math.min(edges.a,edges.b)}</div><div class="sub">${edges.a===edges.b?'even':`${esc(M[(edges.a>edges.b?A:B).m].short)} has the edge`}</div></div></div>
     <div class="lu">${hd}${rows.join('')}${ft}</div>
     <p class="note">ESPN's numbers are ESPN's own projections. Ours come from each player's recent games (recent weeks count more), pulled toward a typical starter at his position, with zero for byes and players ruled out and a discount for doubtful or questionable. In a 2026 backtest, ours missed by about 6.4 points per starter and ESPN's by 6.35. The arrow marks the edge at each spot using the average of both. Lineups refresh Thursday afternoon, Saturday night and Sunday morning, so late swaps may not show yet.</p></div>`;
 }
