@@ -447,6 +447,9 @@ main>.mx-two{gap:22px}
 .sc-wk span{color:var(--muted)}.sc-wk.us{background:var(--good-bg)}.sc-wk.espn{background:var(--soft)}
 .gm-up{color:var(--good)}.gm-dn{color:var(--bad)}
 .lu-hd .lu-tn{font-family:var(--display);font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.03em}
+.mx-warn{background:var(--bad-bg);color:var(--ink);border-left:4px solid var(--bad);border-radius:8px;padding:12px 16px;font-size:14px;line-height:1.5}
+.mx-warn b:first-child{color:var(--bad)}
+details.how{margin-top:10px}details.how summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}details.how p{margin-top:6px}
 </style>
 </head>
 <body>
@@ -1628,8 +1631,10 @@ function lineupCard(A,B,wk){
       <div class="tile"><div class="k">ESPN projection</div><div class="v num">${f1(Math.max(tot.ae,tot.be))}–${f1(Math.min(tot.ae,tot.be))}</div><div class="sub">${espnFav}</div></div>
       <div class="tile"><div class="k">Our projection</div><div class="v num">${f1(Math.max(tot.ao,tot.bo))}–${f1(Math.min(tot.ao,tot.bo))}</div><div class="sub">${ourFav}</div></div>
       <div class="tile"><div class="k">Position edges</div><div class="v num">${Math.max(edges.a,edges.b)}–${Math.min(edges.a,edges.b)}</div><div class="sub">${edges.a===edges.b?'even':`${esc(M[(edges.a>edges.b?A:B).m].short)} has the edge`}</div></div></div>
+    ${(()=>{const dis=[...ra.map(r=>({r,t:A})),...rb.map(r=>({r,t:B}))].filter(x=>x.r.espn!=null&&!x.r.bye).map(x=>({...x,d:x.r.espn-x.r.ours})).sort((p,q)=>Math.abs(q.d)-Math.abs(p.d)).slice(0,3).filter(x=>Math.abs(x.d)>=2);
+      return dis.length?`<div class="mx-lbl" style="margin-top:0">Biggest disagreements</div><div class="tiles" style="margin-bottom:14px">${dis.map(x=>`<div class="tile"><div class="k">${esc(x.r.n)} · ${esc(M[x.t.m].short)}</div><div class="v num">${f1(Math.max(x.r.espn,x.r.ours))}–${f1(Math.min(x.r.espn,x.r.ours))}</div><div class="sub">${x.d>0?'ESPN':'We'} ${x.d>0?'likes':'like'} him more, by ${f1(Math.abs(x.d))}</div></div>`).join('')}</div>`:'';})()}
     <div class="lu">${hd}${rows.join('')}${ft}</div>
-    <p class="note">ESPN's numbers are ESPN's own projections. Ours come from each player's recent games (recent weeks count more), pulled toward a typical starter at his position, with zero for byes and players ruled out and a discount for doubtful or questionable. In a 2026 backtest, ours missed by about 6.4 points per starter and ESPN's by 6.35. The arrow marks the edge at each spot using the average of both. Lineups refresh Thursday afternoon, Saturday night and Sunday morning, so late swaps may not show yet.</p></div>`;
+    <details class="how"><summary>How this works</summary><p class="note">ESPN's numbers are ESPN's own projections. Ours come from each player's recent games (recent weeks count more), pulled toward a typical starter at his position, with zero for byes and players ruled out and a discount for doubtful or questionable. In a 2026 backtest, ours missed by about 6.4 points per starter and ESPN's by 6.35. The arrow marks the edge at each spot using the average of both. The header's blended projection is 85% these lineups (ESPN 70%, ours 30%) and 15% season form. Lineups refresh Thursday afternoon, Saturday night and Sunday morning, so late swaps may not show yet.</p></details></div>`;
 }
 // ----- Lineup alerts, projections scorecard, game recap pages -----
 function lineupAlerts(nextWk){
@@ -1735,14 +1740,14 @@ function vMatchup(aid,bid){
   const hiWks=t=>sc[t.id].filter(x=>{const all=(weekly[curS.y+'-'+x.wk]||[]).map(o=>o.s); return x.s>=Math.max(...all);}).length;
   const form=t=>sc[t.id].slice(-5).map(x=>`<span class="fdot ${x.s>x.o?'w':x.s<x.o?'l':''}" title="Wk ${x.wk}: ${f2(x.s)}-${f2(x.o)}">${x.s>x.o?'W':x.s<x.o?'L':'T'}</span>`).join('');
   const sosR=list.filter(t=>remaining[t.id].length).slice().sort((x,y)=>sos[y.id]-sos[x.id]);
-  const side=(t,p,al)=>`<div class="mx-side ${al}"><div class="mx-seed">#${rank(t)} seed</div><div class="mx-tn">${esc(t.n)}</div><div>${mlink(t.m)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG</div><div class="mx-form">${form(t)}</div><div class="mx-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div><div class="sub">Proj. ${f1(tm(t,wk).mu)}</div></div>`;
+  const side=(t,p,al)=>`<div class="mx-side ${al}"><div class="mx-seed">#${rank(t)} seed</div><div class="mx-tn">${esc(t.n)}</div><div>${mlink(t.m)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG</div><div class="mx-form">${form(t)}</div><div class="mx-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div><div class="sub">${tm(t,wk).lu?'Blended proj.':'Proj.'} ${f1(tm(t,wk).mu)}</div></div>`;
   const spread=Math.abs(TA.mu-TB.mu), favT=TA.mu>=TB.mu?A:B;
   const tsd=t=>tm(t,wk).sd;
-  const rangeTile=t=>`<div class="tile"><div class="k">${esc(M[t.m].short)}'s likely range</div><div class="v num">${f0(tm(t,wk).mu+1.2816*tsd(t))}–${f0(tm(t,wk).mu-1.2816*tsd(t))}</div><div class="sub">8 in 10 weeks land here</div></div>`;
+  const rangeTile=t=>`<div class="tile"><div class="k">${esc(t.n)} range</div><div class="v num">${f0(tm(t,wk).mu+1.2816*tsd(t))}–${f0(tm(t,wk).mu-1.2816*tsd(t))}</div><div class="sub">8 in 10 weeks land here</div></div>`;
   const dmu=TA.mu-TB.mu, dsd=Math.sqrt(tsd(A)**2+tsd(B)**2);
   const pClose=Phi((5-dmu)/dsd)-Phi((-5-dmu)/dsd), pBlow=1-Phi((40-dmu)/dsd)+Phi((-40-dmu)/dsd);
   const hero=`<div class="card mx-hero"><div class="mx-top">${back}<span class="pill p-live">${isPO?(wk===curS.reg+3?'Championship':wk===curS.reg+2?'Semifinal':'Quarterfinal')+' · ':''}Week ${wk}</span></div>
-    <div class="mx-grid">${side(A,pa,'l')}<div class="mx-mid"><div class="mx-vs">vs</div><div class="sub">${esc(M[favT.m].short)} by ${f1(spread)}</div><div class="sub mx-basis">${TA.lu&&TB.lu?'based on this week\'s lineups':'based on season scoring'}</div></div>${side(B,pb,'r')}</div>
+    <div class="mx-grid">${side(A,pa,'l')}<div class="mx-mid"><div class="mx-vs">vs</div><div class="sub">${esc(M[favT.m].short)} by ${f1(spread)}</div><div class="sub mx-basis">${TA.lu&&TB.lu?'mostly this week\'s lineups, a little season form':'based on season scoring'}</div></div>${side(B,pb,'r')}</div>
     <div class="mx-bar"><i style="width:${pa*100}%"></i></div>
     <div class="tiles" style="margin-top:16px">${rangeTile(A)}${rangeTile(B)}
       <div class="tile"><div class="k">Nail-biter</div><div class="v num">${f0(pClose*100)}%</div><div class="sub">decided by under 5</div></div>
@@ -1846,6 +1851,9 @@ function vMatchup(aid,bid){
           <div class="tile"><div class="k">Lowest score</div><div class="v num">${f2(lo.s)}</div><div class="sub">${esc(M[lo.m].short)}, ${when(lo.x)}</div></div>
           ${blow?`<div class="tile"><div class="k">Biggest blowout</div><div class="v num">+${f1(Math.abs(blow.ms-blow.os))}</div><div class="sub">${wn(blow)}, ${when(blow)}</div></div>`:''}
           ${close?`<div class="tile"><div class="k">Closest game</div><div class="v num">+${f2(Math.abs(close.ms-close.os))}</div><div class="sub">${wn(close)}, ${when(close)}</div></div>`:''}</div>`;})()}
+      ${L.length>=3?(()=>{let d=0; const pts=L.map((x,k)=>{d+=x.r==='W'?1:x.r==='L'?-1:0; return [k+1,d,`${x.y} Wk ${x.wk}: ${x.r==='W'?M[A.m].short:x.r==='L'?M[B.m].short:'Tie'}`];});
+        const mx=Math.max(1,...pts.map(p=>Math.abs(p[1]))), lab=v=>v>0?`${M[A.m].short} +${v}`:v<0?`${M[B.m].short} +${-v}`:'Even';
+        return `<div class="mx-lbl">Series lead over time</div>${lineChart({xs:pts.map(p=>p[0]),series:[{name:'Series lead',color:'var(--accent)',pts}],yMin:-mx-1,yMax:mx+1,yTicks:[-mx,0,mx],yFmt:v=>lab(Math.round(v)),h:200})}<p class="note" style="margin-top:2px">Meeting 1 is ${L[0].y}. Above the middle line, ${esc(M[A.m].short)} leads the series; below it, ${esc(M[B.m].short)} does.</p>`;})():''}
       <div class="mx-lbl">Recent meetings</div><div class="rec-list">${L.slice().reverse().slice(0,8).map(x=>{const w=x.r==='W'?A.m:x.r==='L'?B.m:null; return `<div class="rec-row" style="grid-template-columns:90px 1fr auto"><span class="sub">${x.y} Wk ${x.wk}${x.po?' <span class="pill p-po">PO</span>':''}</span><span>${w!=null?`<b>${esc(M[w].short)}</b> won`:'Tie'}</span><a class="num" href="#season-${x.y}">${f2(x.ms)}–${f2(x.os)}</a></div>`;}).join('')}</div>
       ${L.length>8?`<p class="note">Most recent 8 of ${L.length} meetings.</p>`:''}</div>`;
   } else h2hHtml=`<div class="card"><h3>All-Time Head-to-Head</h3><p class="note">First ever meeting.</p></div>`;
@@ -1856,7 +1864,11 @@ function vMatchup(aid,bid){
   // other games this week
   const others=(isPO?curS.poUp:up).filter(g=>g.wk===wk&&g!==game);
   const otherHtml=others.length?`<div class="mx-others">${others.map(g=>`<a href="#matchup-${g.ht.id}-${g.at.id}">${esc(M[g.ht.m].short)} vs ${esc(M[g.at.m].short)}</a>`).join('')}</div>`:'';
-  return `${hero}${lineupCard(A,B,wk)}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} ${isPO?'Playoff ':''}Matchups</h3></div>${otherHtml}</div>`:''}`;
+  const warn=(()=>{const L=window.LINEUPS; if(!L||L.y!==curS.y||L.wk!==wk) return ''; const out=[];
+    [A,B].forEach(t=>{const rows=L.teams[t.id]||[]; rows.forEach(r=>{const why=r.bye?'on bye':r.inj==='O'?'ruled out':r.inj==='IR'?'on IR':r.inj==='SSPD'?'suspended':r.inj==='D'?'doubtful':null; if(why) out.push(`<b>${esc(M[t.m].short)}</b> is starting ${esc(r.n)} (${r.pos}, ${why})`);});
+      const mx=Math.max(...Object.values(L.teams).map(v=>v.length)); if(rows.length&&rows.length<mx) out.push(`<b>${esc(M[t.m].short)}</b> has an empty starting spot`);});
+    return out.length?`<div class="mx-warn"><b>Lineup warning.</b> ${out.join(' · ')}.</div>`:'';})();
+  return `${hero}${warn}${lineupCard(A,B,wk)}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} ${isPO?'Playoff ':''}Matchups</h3></div>${otherHtml}</div>`:''}`;
 }
 // ----- League timeline -----
 function vTimeline(){
