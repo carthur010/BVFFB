@@ -1651,7 +1651,7 @@ function vMatchup(aid,bid){
       <div class="tile"><div class="k">League history</div><div class="v num">${isNaN(upRate)?'–':f0(upRate*100)+'%'}</div><div class="sub">underdogs won ${sim.filter(x=>!x.favWon).length} of ${sim.length} games with a favorite at ${f0((fp-band)*100)}–${f0(Math.min(.99,fp+band)*100)}%</div></div>
       <div class="tile"><div class="k">${esc(M[dog.m].short)} as an underdog</div><div class="v num">${rec(dogW,asDog.length-dogW)}</div><div class="sub">${asDog.length?f0(dogW/asDog.length*100)+'% all-time':'no history'}</div></div>
       <div class="tile"><div class="k">${esc(M[fav.m].short)} as a favorite</div><div class="v num">${rec(favW,asFav.length-favW)}</div><div class="sub">${asFav.length?f0(favW/asFav.length*100)+'% all-time':'no history'}</div></div>
-      ${bigUp?`<div class="tile"><div class="k">${esc(M[dog.m].short)}'s biggest upset</div><div class="v num">${f0((1-bigUp.p)*100)}%</div><div class="sub">beat ${esc(M[bigUp.favM].short)}, <a href="#season-${bigUp.y}">${bigUp.y} Wk ${bigUp.wk}</a></div></div>`:''}
+      ${bigUp?`<div class="tile"><div class="k">${esc(M[dog.m].short)}'s biggest upset</div><div class="v num">${f0(bigUp.p*100)}%</div><div class="sub">beat ${esc(M[bigUp.favM].short)} when ${esc(M[bigUp.favM].short)} was that big a favorite, <a href="#season-${bigUp.y}">${bigUp.y} Wk ${bigUp.wk}</a></div></div>`:''}
     </div><p class="note">Favorites are judged from each team's scoring up to that week. Regular season, from Week 4 on.</p></div>`;
   // tale of the tape
   const sa=scores(A), sb=scores(B), apA=allPlay(A), apB=allPlay(B);
