@@ -434,6 +434,10 @@ main>.mx-two{gap:22px}
 .bk-link{display:block;padding:6px 10px;font-size:12px;font-weight:600;border-top:1px solid var(--line);text-decoration:none;color:var(--accent);background:var(--surface)}
 .mx-two>.card{display:flex;flex-direction:column}
 .mx-two .mx-tape{flex:1;justify-content:space-between}
+.mx-two>.card .chart{flex:1;display:flex;align-items:center}
+.h2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+.h2-grid>div>.mx-lbl:first-child{margin-top:0}
+@media (max-width:900px){.h2-grid{grid-template-columns:1fr}}
 .sc-tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .sc-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 4px}
 .sc-two>div{display:flex;flex-direction:column;padding:6px 8px;border-radius:6px;background:var(--surface)}
@@ -1840,7 +1844,7 @@ function vMatchup(aid,bid){
     const lead=h.w>h.l?`${esc(M[A.m].short)} leads ${h.w}-${h.l}${h.t?'-'+h.t:''}`:h.l>h.w?`${esc(M[B.m].short)} leads ${h.l}-${h.w}${h.t?'-'+h.t:''}`:`Tied ${h.w}-${h.l}${h.t?'-'+h.t:''}`;
     const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
     h2hHtml=`<div class="card"><div class="head" style="margin-bottom:12px"><h3>All-Time Head-to-Head</h3><a class="chip" href="#versus-${A.m}-${B.m}">Full breakdown</a></div>
-      <div class="tiles">${tile('Series',lead,`${h.n} meetings since ${L[0].y}`)}${tile('Playoffs',`${h.pw}-${h.pl}`,h.pw+h.pl?`${esc(M[A.m].short)}'s record`:'never met')}${tile('Avg score',`${f1(h.pf/h.n)}–${f1(h.pa/h.n)}`)}${tile('Streak',last.r==='T'?'Tied last':`${esc(M[last.r==='W'?A.m:B.m].short)} ${n}`,last.r==='T'?'':`won the last ${n>1?n:'one'}`)}</div>
+      <div class="h2-grid"><div><div class="tiles">${tile('Series',lead,`${h.n} meetings since ${L[0].y}`)}${tile('Playoffs',`${h.pw}-${h.pl}`,h.pw+h.pl?`${esc(M[A.m].short)}'s record`:'never met')}${tile('Avg score',`${f1(h.pf/h.n)}–${f1(h.pa/h.n)}`)}${tile('Streak',last.r==='T'?'Tied last':`${esc(M[last.r==='W'?A.m:B.m].short)} ${n}`,last.r==='T'?'':`won the last ${n>1?n:'one'}`)}</div>
       ${(()=>{const sg=L.filter(x=>!x.g.multi); if(!sg.length) return ''; const hiA=sg.slice().sort((p,q)=>q.ms-p.ms)[0], hiB=sg.slice().sort((p,q)=>q.os-p.os)[0];
         const best=hiA.ms>=hiB.os?{m:A.m,s:hiA.ms,x:hiA}:{m:B.m,s:hiB.os,x:hiB};
         const lo=sg.flatMap(x=>[{m:A.m,s:x.ms,x},{m:B.m,s:x.os,x}]).sort((p,q)=>p.s-q.s)[0];
@@ -1851,11 +1855,11 @@ function vMatchup(aid,bid){
           <div class="tile"><div class="k">Lowest score</div><div class="v num">${f2(lo.s)}</div><div class="sub">${esc(M[lo.m].short)}, ${when(lo.x)}</div></div>
           ${blow?`<div class="tile"><div class="k">Biggest blowout</div><div class="v num">+${f1(Math.abs(blow.ms-blow.os))}</div><div class="sub">${wn(blow)}, ${when(blow)}</div></div>`:''}
           ${close?`<div class="tile"><div class="k">Closest game</div><div class="v num">+${f2(Math.abs(close.ms-close.os))}</div><div class="sub">${wn(close)}, ${when(close)}</div></div>`:''}</div>`;})()}
-      ${L.length>=3?(()=>{let d=0; const pts=L.map((x,k)=>{d+=x.r==='W'?1:x.r==='L'?-1:0; return [k+1,d,`${x.y} Wk ${x.wk}: ${x.r==='W'?M[A.m].short:x.r==='L'?M[B.m].short:'Tie'}`];});
-        const mx=Math.max(1,...pts.map(p=>Math.abs(p[1]))), lab=v=>v>0?`${M[A.m].short} +${v}`:v<0?`${M[B.m].short} +${-v}`:'Even';
-        return `<div class="mx-lbl">Series lead over time</div>${lineChart({xs:pts.map(p=>p[0]),series:[{name:'Series lead',color:'var(--accent)',pts}],yMin:-mx-1,yMax:mx+1,yTicks:[-mx,0,mx],yFmt:v=>lab(Math.round(v)),h:200})}<p class="note" style="margin-top:2px">Meeting 1 is ${L[0].y}. Above the middle line, ${esc(M[A.m].short)} leads the series; below it, ${esc(M[B.m].short)} does.</p>`;})():''}
+      </div><div>${L.length>=3?(()=>{let d=0; const pts=L.map((x,k)=>{d+=x.r==='W'?1:x.r==='L'?-1:0; return [k+1,d,`${x.y} Wk ${x.wk}: ${x.r==='W'?M[A.m].short:x.r==='L'?M[B.m].short:'Tie'}`];});
+        const mx=Math.max(1,...pts.map(p=>Math.abs(p[1]))), ia=M[A.m].short[0], ib=M[B.m].short[0]===ia?M[B.m].short.slice(0,2):M[B.m].short[0], lab=v=>v>0?`${ia} +${v}`:v<0?`${ib} +${-v}`:'Even';
+        return `<div class="mx-lbl">Series lead over time</div>${lineChart({xs:pts.map(p=>p[0]),series:[{name:'Series lead',color:'var(--accent)',pts}],yMin:-mx-1,yMax:mx+1,yTicks:[-mx,0,mx],yFmt:v=>lab(Math.round(v)),h:200})}<p class="note" style="margin-top:2px">Meeting 1 is ${L[0].y}. Above the middle line, ${esc(M[A.m].short)} (${ia}) leads the series; below it, ${esc(M[B.m].short)} (${ib}) does.</p>`;})():''}
       <div class="mx-lbl">Recent meetings</div><div class="rec-list">${L.slice().reverse().slice(0,8).map(x=>{const w=x.r==='W'?A.m:x.r==='L'?B.m:null; return `<div class="rec-row" style="grid-template-columns:90px 1fr auto"><span class="sub">${x.y} Wk ${x.wk}${x.po?' <span class="pill p-po">PO</span>':''}</span><span>${w!=null?`<b>${esc(M[w].short)}</b> won`:'Tie'}</span><a class="num" href="#season-${x.y}">${f2(x.ms)}–${f2(x.os)}</a></div>`;}).join('')}</div>
-      ${L.length>8?`<p class="note">Most recent 8 of ${L.length} meetings.</p>`:''}</div>`;
+      ${L.length>8?`<p class="note">Most recent 8 of ${L.length} meetings.</p>`:''}</div></div></div>`;
   } else h2hHtml=`<div class="card"><h3>All-Time Head-to-Head</h3><p class="note">First ever meeting.</p></div>`;
   // rest of schedule
   const restRow=t=>{const r=up.filter(g=>(g.ht===t||g.at===t)&&g.wk!==wk).sort((x,y)=>x.wk-y.wk);
@@ -1868,7 +1872,7 @@ function vMatchup(aid,bid){
     [A,B].forEach(t=>{const rows=L.teams[t.id]||[]; rows.forEach(r=>{const why=r.bye?'on bye':r.inj==='O'?'ruled out':r.inj==='IR'?'on IR':r.inj==='SSPD'?'suspended':r.inj==='D'?'doubtful':null; if(why) out.push(`<b>${esc(M[t.m].short)}</b> is starting ${esc(r.n)} (${r.pos}, ${why})`);});
       const mx=Math.max(...Object.values(L.teams).map(v=>v.length)); if(rows.length&&rows.length<mx) out.push(`<b>${esc(M[t.m].short)}</b> has an empty starting spot`);});
     return out.length?`<div class="mx-warn"><b>Lineup warning.</b> ${out.join(' · ')}.</div>`:'';})();
-  return `${hero}${warn}${lineupCard(A,B,wk)}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} ${isPO?'Playoff ':''}Matchups</h3></div>${otherHtml}</div>`:''}`;
+  return `${hero}${warn}${lineupCard(A,B,wk)}${stakes}${upset}<div class="mx-two">${tapeHtml}${chart}</div>${h2hHtml}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} ${isPO?'Playoff ':''}Matchups</h3></div>${otherHtml}</div>`:''}`;
 }
 // ----- League timeline -----
 function vTimeline(){
