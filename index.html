@@ -446,6 +446,7 @@ main>.mx-two{gap:22px}
 @media (max-width:640px){.sc-tiles{grid-template-columns:1fr 1fr}}
 .sc-wk span{color:var(--muted)}.sc-wk.us{background:var(--good-bg)}.sc-wk.espn{background:var(--soft)}
 .gm-up{color:var(--good)}.gm-dn{color:var(--bad)}
+.lu-hd .lu-tn{font-family:var(--display);font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.03em}
 </style>
 </head>
 <body>
@@ -1618,7 +1619,7 @@ function lineupCard(A,B,wk){
         <div class="lu-side${warn(a)}">${cellA(a)}<span class="num lu-n">${a&&a.espn!=null?f1(a.espn):'–'}</span><span class="num lu-n ${win>0?'better':''}">${a?f1(a.ours):'–'}</span></div>
         <div class="lu-slot ${win>0?'ea':win<0?'eb':''}">${esc(L.slots[sl]||'')}<i>${win>0?'◀':win<0?'▶':'='}</i></div>
         <div class="lu-side r${warn(b)}"><span class="num lu-n ${win<0?'better':''}">${b?f1(b.ours):'–'}</span><span class="num lu-n">${b&&b.espn!=null?f1(b.espn):'–'}</span>${cellA(b)}</div></div>`);}});
-  const hd=`<div class="lu-row lu-hd"><div class="lu-side"><span>${esc(M[A.m].short)}</span><span class="lu-n">ESPN</span><span class="lu-n">Ours</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="lu-n">Ours</span><span class="lu-n">ESPN</span><span>${esc(M[B.m].short)}</span></div></div>`;
+  const hd=`<div class="lu-row lu-hd"><div class="lu-side"><span class="lu-tn">${esc(A.n)}</span><span class="lu-n">ESPN</span><span class="lu-n">Ours</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="lu-n">Ours</span><span class="lu-n">ESPN</span><span class="lu-tn" style="text-align:right">${esc(B.n)}</span></div></div>`;
   const ft=`<div class="lu-row lu-tot"><div class="lu-side"><span>Projected total</span><span class="num lu-n">${f1(tot.ae)}</span><span class="num lu-n ${tot.ao>tot.bo?'better':''}">${f1(tot.ao)}</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="num lu-n ${tot.bo>tot.ao?'better':''}">${f1(tot.bo)}</span><span class="num lu-n">${f1(tot.be)}</span><span></span></div></div>`;
   const upd=L.U?new Date(L.U).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
   const espnFav=Math.abs(tot.ae-tot.be)<.05?'even':`${esc(M[(tot.ae>tot.be?A:B).m].short)} by ${f1(Math.abs(tot.ae-tot.be))}`, ourFav=Math.abs(tot.ao-tot.bo)<.05?'even':`${esc(M[(tot.ao>tot.bo?A:B).m].short)} by ${f1(Math.abs(tot.ao-tot.bo))}`;
@@ -1691,7 +1692,7 @@ function vGame(wk,hid,aid){
   const delta=r=>r&&r[5]!=null?`<span class="num lu-n ${r[4]-r[5]>=0?'gm-up':'gm-dn'}">${r[4]-r[5]>=0?'+':''}${f1(r[4]-r[5])}</span>`:'<span class="lu-n"></span>';
   const rows=[]; order.forEach(sl=>{const xa=ra.st.filter(r=>r[0]===sl), xb=rb.st.filter(r=>r[0]===sl); for(let k=0;k<Math.max(xa.length,xb.length);k++){const a=xa[k], b=xb[k];
     rows.push(`<div class="lu-row"><div class="lu-side">${cell(a)}${delta(a)}${pts(a,b)}</div><div class="lu-slot">${slotName(sl)}</div><div class="lu-side r">${pts(b,a)}${delta(b)}${cell(b)}</div></div>`);}});
-  const hd=`<div class="lu-row lu-hd"><div class="lu-side"><span>${esc(M[A.m].short)}</span><span class="lu-n">vs ESPN</span><span class="lu-n">Pts</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="lu-n">Pts</span><span class="lu-n">vs ESPN</span><span>${esc(M[B.m].short)}</span></div></div>`;
+  const hd=`<div class="lu-row lu-hd"><div class="lu-side"><span class="lu-tn">${esc(A.n)}</span><span class="lu-n">vs ESPN</span><span class="lu-n">Pts</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="lu-n">Pts</span><span class="lu-n">vs ESPN</span><span class="lu-tn" style="text-align:right">${esc(B.n)}</span></div></div>`;
   const ft=`<div class="lu-row lu-tot"><div class="lu-side"><span>Total</span><span></span><span class="num lu-n">${f2(as)}</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="num lu-n">${f2(bs)}</span><span></span><span></span></div></div>`;
   const allP=[...ra.st.map(r=>({r,t:A})),...rb.st.map(r=>({r,t:B}))];
   const mvp=allP.slice().sort((x,y)=>y.r[4]-x.r[4])[0], bust=allP.filter(x=>x.r[5]!=null).sort((x,y)=>(x.r[4]-x.r[5])-(y.r[4]-y.r[5]))[0], boom=allP.filter(x=>x.r[5]!=null).sort((x,y)=>(y.r[4]-y.r[5])-(x.r[4]-x.r[5]))[0];
@@ -1737,7 +1738,7 @@ function vMatchup(aid,bid){
   const side=(t,p,al)=>`<div class="mx-side ${al}"><div class="mx-seed">#${rank(t)} seed</div><div class="mx-tn">${esc(t.n)}</div><div>${mlink(t.m)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG</div><div class="mx-form">${form(t)}</div><div class="mx-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div><div class="sub">Proj. ${f1(tm(t,wk).mu)}</div></div>`;
   const spread=Math.abs(TA.mu-TB.mu), favT=TA.mu>=TB.mu?A:B;
   const tsd=t=>tm(t,wk).sd;
-  const rangeTile=t=>`<div class="tile"><div class="k">${esc(M[t.m].short)}'s likely range</div><div class="v num">${f0(tm(t,wk).mu-1.2816*tsd(t))}–${f0(tm(t,wk).mu+1.2816*tsd(t))}</div><div class="sub">8 in 10 weeks land here</div></div>`;
+  const rangeTile=t=>`<div class="tile"><div class="k">${esc(M[t.m].short)}'s likely range</div><div class="v num">${f0(tm(t,wk).mu+1.2816*tsd(t))}–${f0(tm(t,wk).mu-1.2816*tsd(t))}</div><div class="sub">8 in 10 weeks land here</div></div>`;
   const dmu=TA.mu-TB.mu, dsd=Math.sqrt(tsd(A)**2+tsd(B)**2);
   const pClose=Phi((5-dmu)/dsd)-Phi((-5-dmu)/dsd), pBlow=1-Phi((40-dmu)/dsd)+Phi((-40-dmu)/dsd);
   const hero=`<div class="card mx-hero"><div class="mx-top">${back}<span class="pill p-live">${isPO?(wk===curS.reg+3?'Championship':wk===curS.reg+2?'Semifinal':'Quarterfinal')+' · ':''}Week ${wk}</span></div>
