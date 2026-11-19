@@ -415,6 +415,8 @@ button.badge.on{background:var(--soft)}
 .mx-others a:hover{border-left-color:var(--gold)}
 main>.mx-two{gap:22px}
 @media (max-width:800px){.mx-two{grid-template-columns:1fr}.mx-tn{font-size:20px}.mx-p{font-size:40px}}
+.mx-lbl{margin:16px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--muted)}
+.mx-scen{margin:0;padding-left:18px;font-size:14px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -1554,6 +1556,20 @@ function recapCard(){
     <div class="rc-lbl">Results</div><div class="results rc-res">${wg.map(g=>`<div class="res">${side(g.wt,g.ws,!g.tie)}${side(g.lt,g.ls,false)}</div>`).join('')}</div></div>`;
 }
 
+// historical pre-game win chances (same idea as the live model, simplified), for upset context
+let HISTP=null;
+function histProbs(){
+  if(HISTP) return HISTP; HISTP=[];
+  YEARS.forEach(y=>{const gs=GAMES.filter(g=>g.y===y&&!g.po&&!g.multi).sort((a,b)=>a.wk-b.wk); const sc={}, all=[];
+    const wks=[...new Set(gs.map(g=>g.wk))];
+    wks.forEach(w=>{const wg=gs.filter(g=>g.wk===w);
+      if(all.length>=20){const L=avg(all), sdv=sd(all);
+        wg.forEach(g=>{const a=sc[g.ht.id]||[], b=sc[g.at.id]||[]; if(a.length<3||b.length<3||g.tie) return;
+          const ma=(a.length*avg(a)+3*L)/(a.length+3), mb=(b.length*avg(b)+3*L)/(b.length+3); const ph=Phi((ma-mb)/(sdv*Math.SQRT2));
+          const favH=ph>=.5; HISTP.push({y,wk:w,p:favH?ph:1-ph,favM:favH?g.h:g.a,dogM:favH?g.a:g.h,favWon:g.win===(favH?g.h:g.a),g});});}
+      wg.forEach(g=>{(sc[g.ht.id]=sc[g.ht.id]||[]).push(g.hs); (sc[g.at.id]=sc[g.at.id]||[]).push(g.as); all.push(g.hs,g.as);});});});
+  return HISTP;
+}
 // ----- Matchup preview page -----
 function vMatchup(aid,bid){
   const back=`<a class="chip" href="#now">‹ ${CUR} Season</a>`;
@@ -1574,9 +1590,16 @@ function vMatchup(aid,bid){
   const sosR=list.filter(t=>remaining[t.id].length).slice().sort((x,y)=>sos[y.id]-sos[x.id]);
   const side=(t,p,al)=>`<div class="mx-side ${al}"><div class="mx-seed">#${rank(t)} seed</div><div class="mx-tn">${esc(t.n)}</div><div>${mlink(t.m)}</div><div class="sub">${rec(t.w,t.l,t.t)} · ${f1(t.ppg)} PPG</div><div class="mx-form">${form(t)}</div><div class="mx-p num ${p>=.5?'fav':''}">${f0(p*100)}%</div><div class="sub">Proj. ${f1(model[t.id].mu)}</div></div>`;
   const spread=Math.abs(model[A.id].mu-model[B.id].mu), favT=model[A.id].mu>=model[B.id].mu?A:B;
+  const tsd=t=>Math.sqrt(model[t.id].sig**2+model[t.id].se**2);
+  const rangeTile=t=>`<div class="tile"><div class="k">${esc(M[t.m].short)}'s likely range</div><div class="v num">${f0(model[t.id].mu-1.2816*tsd(t))}–${f0(model[t.id].mu+1.2816*tsd(t))}</div><div class="sub">8 in 10 weeks land here</div></div>`;
+  const dmu=model[A.id].mu-model[B.id].mu, dsd=Math.sqrt(tsd(A)**2+tsd(B)**2);
+  const pClose=Phi((5-dmu)/dsd)-Phi((-5-dmu)/dsd), pBlow=1-Phi((40-dmu)/dsd)+Phi((-40-dmu)/dsd);
   const hero=`<div class="card mx-hero"><div class="mx-top">${back}<span class="pill p-live">Week ${wk}</span></div>
     <div class="mx-grid">${side(A,pa,'l')}<div class="mx-mid"><div class="mx-vs">vs</div><div class="sub">${esc(M[favT.m].short)} by ${f1(spread)}</div></div>${side(B,pb,'r')}</div>
-    <div class="mx-bar"><i style="width:${pa*100}%"></i></div></div>`;
+    <div class="mx-bar"><i style="width:${pa*100}%"></i></div>
+    <div class="tiles" style="margin-top:16px">${rangeTile(A)}${rangeTile(B)}
+      <div class="tile"><div class="k">Nail-biter</div><div class="v num">${f0(pClose*100)}%</div><div class="sub">decided by under 5</div></div>
+      <div class="tile"><div class="k">Blowout</div><div class="v num">${f0(pBlow*100)}%</div><div class="sub">decided by 40+</div></div></div></div>`;
   // playoff stakes
   const stake=t=>{const c=cond[t.id], r=res[t.id], st=status[t.id];
     const row=(k,now,w,l)=>`<tr><td>${k}</td><td class="r num">${pc(now)}</td><td class="r num"><b>${pc(w)}</b></td><td class="r num">${pc(l)}</td></tr>`;
@@ -1585,8 +1608,51 @@ function vMatchup(aid,bid){
     return `<div><div class="mx-sh">${esc(t.n)}${tag?` <span class="pill p-po">${tag}</span>`:''}</div>
       <table><thead><tr><th></th><th class="r">Now</th><th class="r">With a win</th><th class="r">With a loss</th></tr></thead><tbody>
       ${row('Playoffs',r.po/N,c.w?c.wpo/c.w:0,c.l?c.lpo/c.l:0)}${row('Bye',r.bye/N,c.w?c.wbye/c.w:0,c.l?c.lbye/c.l:0)}${row('Title',r.title/N,c.w?c.wt/c.w:0,c.l?c.lt/c.l:0)}</tbody></table>
-      ${sw&&sw[1]>=0.01?`<p class="note">This game swings ${esc(M[t.m].short)}'s ${sw[0]} odds by <b>${f0(sw[1]*100)} points</b>.</p>`:''}</div>`;};
+      ${sw&&sw[1]>=0.01?`<p class="note">This game swings ${esc(M[t.m].short)}'s ${sw[0]} odds by <b>${f0(sw[1]*100)} points</b>.</p>`:''}${wk===nxW?scenHtml(t):''}</div>`;};
+  // exact clinch / elimination scenarios for this week
+  const wkG=up.filter(g=>g.wk===wk);
+  const afterWeek=winners=>{const W={},rem={}; list.forEach(t=>{W[t.id]=t.w+t.t/2; rem[t.id]=remaining[t.id].length;});
+    wkG.forEach((g,i)=>{W[winners[i].id]++; rem[g.ht.id]--; rem[g.at.id]--;});
+    return t=>{const w=W[t.id], o=list.filter(x=>x!==t), canPass=o.filter(x=>W[x.id]+rem[x.id]>=w).length, ahead=o.filter(x=>W[x.id]>w+rem[t.id]).length;
+      return {po:canPass<=po-1, bye:canPass<=1, elim:ahead>=po};};};
+  const scen=t=>{const gi=wkG.findIndex(g=>g.ht===t||g.at===t); if(gi<0) return []; const st=status[t.id];
+    const oi=wkG.map((_,i)=>i).filter(i=>i!==gi), n=oi.length, combos=[];
+    for(let mask=0;mask<(1<<n);mask++){const win=wkG.map(g=>g.ht); oi.forEach((gk,b)=>{win[gk]=(mask>>b)&1?wkG[gk].at:wkG[gk].ht;}); combos.push(win);}
+    const lines=[];
+    const loser=(win,gk)=>win[gk]===wkG[gk].ht?wkG[gk].at:wkG[gk].ht;
+    const describe=(set,byWin)=>{ const nm=(g,side,w)=>{const t=w?(side==='ht'?g.ht:g.at):(side==='ht'?g.at:g.ht); return esc(M[t.m].short);}; // set: boolean array over combos; returns text or null
+      if(set.every(Boolean)) return '';
+      for(const gk of oi) for(const side of ['ht','at']){const ok=combos.map(c=>c[gk]===wkG[gk][side]); if(ok.every((v,k)=>v===set[k])) return byWin?` and a ${nm(wkG[gk],side,1)} win`:` and a ${nm(wkG[gk],side,0)} loss`;}
+      for(let x=0;x<oi.length;x++) for(let y=x+1;y<oi.length;y++) for(const sx of ['ht','at']) for(const sy of ['ht','at']){
+        const gx=oi[x], gy=oi[y], A1=combos.map(c=>c[gx]===wkG[gx][sx]), B1=combos.map(c=>c[gy]===wkG[gy][sy]);
+        const nx=nm(wkG[gx],sx,byWin), ny=nm(wkG[gy],sy,byWin), wd=byWin?'wins':'losses', w1=byWin?'win':'loss';
+        if(A1.every((v,k)=>(v&&B1[k])===set[k])) return ` plus ${wd} by ${nx} and ${ny}`;
+        if(A1.every((v,k)=>(v||B1[k])===set[k])) return ` and a ${w1} by ${nx} or ${ny}`;}
+      const k=set.filter(Boolean).length; return ` and some help (${k} of ${set.length} ways the other games can go)`;};
+    const ev=[['bye','Clinches a first-round bye'],['po','Clinches a playoff spot'],['elim','Eliminated']];
+    ev.forEach(([key,label])=>{ if(st[key==='po'?'clinched':key]) return;
+      const opp=wkG[gi].ht===t?wkG[gi].at:wkG[gi].ht;
+      const res=[true,false].map(win=>combos.map(c=>{const cc=c.slice(); cc[gi]=win?t:opp; return afterWeek(cc)(t)[key];}));
+      if(res[0].every(Boolean)&&res[1].every(Boolean)){lines.push(`${label} no matter what`); return;}
+      [[0,'with a win'],[1,'with a loss']].forEach(([r,txt])=>{ if(res[r].some(Boolean)) lines.push(`${label} ${txt}${describe(res[r],key==='elim')}`);});});
+    // don't repeat a playoff clinch line when the bye line covers the same case
+    return lines;};
+  const scenHtml=t=>{const L=scen(t); return `<div class="mx-lbl">This week's scenarios</div>${L.length?`<ul class="mx-scen">${L.map(x=>`<li>${x}.</li>`).join('')}</ul>`:'<p class="note" style="margin:0">Nothing can be clinched or lost for good this week.</p>'}`;};
   const stakes=wk===nxW?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Playoff Stakes</h3><span class="sub">from ${N.toLocaleString()} season simulations</span></div><div class="mx-two">${stake(A)}${stake(B)}</div></div>`:'';
+  // upset watch
+  const fav=pa>=pb?A:B, dog=fav===A?B:A, fp=Math.max(pa,pb), HP=histProbs();
+  let band=.05, sim=HP.filter(x=>Math.abs(x.p-fp)<=band); while(sim.length<40&&band<.2){band+=.03; sim=HP.filter(x=>Math.abs(x.p-fp)<=band);}
+  const upRate=sim.length?sim.filter(x=>!x.favWon).length/sim.length:NaN;
+  const asDog=HP.filter(x=>x.dogM===dog.m), dogW=asDog.filter(x=>!x.favWon).length;
+  const asFav=HP.filter(x=>x.favM===fav.m), favW=asFav.filter(x=>x.favWon).length;
+  const bigUp=HP.filter(x=>!x.favWon&&x.dogM===dog.m).sort((a,b)=>b.p-a.p)[0];
+  const upset=`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Upset Watch</h3><span class="sub">${esc(M[fav.m].short)} favored at ${f0(fp*100)}%</span></div>
+    <div class="tiles">
+      <div class="tile"><div class="k">League history</div><div class="v num">${isNaN(upRate)?'–':f0(upRate*100)+'%'}</div><div class="sub">underdogs won ${sim.filter(x=>!x.favWon).length} of ${sim.length} games with a favorite at ${f0((fp-band)*100)}–${f0(Math.min(.99,fp+band)*100)}%</div></div>
+      <div class="tile"><div class="k">${esc(M[dog.m].short)} as an underdog</div><div class="v num">${rec(dogW,asDog.length-dogW)}</div><div class="sub">${asDog.length?f0(dogW/asDog.length*100)+'% all-time':'no history'}</div></div>
+      <div class="tile"><div class="k">${esc(M[fav.m].short)} as a favorite</div><div class="v num">${rec(favW,asFav.length-favW)}</div><div class="sub">${asFav.length?f0(favW/asFav.length*100)+'% all-time':'no history'}</div></div>
+      ${bigUp?`<div class="tile"><div class="k">${esc(M[dog.m].short)}'s biggest upset</div><div class="v num">${f0((1-bigUp.p)*100)}%</div><div class="sub">beat ${esc(M[bigUp.favM].short)}, <a href="#season-${bigUp.y}">${bigUp.y} Wk ${bigUp.wk}</a></div></div>`:''}
+    </div><p class="note">Favorites are judged from each team's scoring up to that week. Regular season, from Week 4 on.</p></div>`;
   // tale of the tape
   const sa=scores(A), sb=scores(B), apA=allPlay(A), apB=allPlay(B);
   const l3=t=>avg(scores(t).slice(-3));
@@ -1619,7 +1685,17 @@ function vMatchup(aid,bid){
     const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
     h2hHtml=`<div class="card"><div class="head" style="margin-bottom:12px"><h3>All-Time Head-to-Head</h3><a class="chip" href="#versus-${A.m}-${B.m}">Full breakdown</a></div>
       <div class="tiles">${tile('Series',lead,`${h.n} meetings since ${L[0].y}`)}${tile('Playoffs',`${h.pw}-${h.pl}`,h.pw+h.pl?`${esc(M[A.m].short)}'s record`:'never met')}${tile('Avg score',`${f1(h.pf/h.n)}–${f1(h.pa/h.n)}`)}${tile('Streak',last.r==='T'?'Tied last':`${esc(M[last.r==='W'?A.m:B.m].short)} ${n}`,last.r==='T'?'':`won the last ${n>1?n:'one'}`)}</div>
-      <div class="rec-list" style="margin-top:12px">${L.slice().reverse().slice(0,8).map(x=>{const w=x.r==='W'?A.m:x.r==='L'?B.m:null; return `<div class="rec-row" style="grid-template-columns:90px 1fr auto"><span class="sub">${x.y} Wk ${x.wk}${x.po?' <span class="pill p-po">PO</span>':''}</span><span>${w!=null?`<b>${esc(M[w].short)}</b> won`:'Tie'}</span><a class="num" href="#season-${x.y}">${f2(x.ms)}–${f2(x.os)}</a></div>`;}).join('')}</div>
+      ${(()=>{const sg=L.filter(x=>!x.g.multi); if(!sg.length) return ''; const hiA=sg.slice().sort((p,q)=>q.ms-p.ms)[0], hiB=sg.slice().sort((p,q)=>q.os-p.os)[0];
+        const best=hiA.ms>=hiB.os?{m:A.m,s:hiA.ms,x:hiA}:{m:B.m,s:hiB.os,x:hiB};
+        const lo=sg.flatMap(x=>[{m:A.m,s:x.ms,x},{m:B.m,s:x.os,x}]).sort((p,q)=>p.s-q.s)[0];
+        const nt=sg.filter(x=>x.r!=='T'), blow=nt.slice().sort((p,q)=>Math.abs(q.ms-q.os)-Math.abs(p.ms-p.os))[0], close=nt.slice().sort((p,q)=>Math.abs(p.ms-p.os)-Math.abs(q.ms-q.os))[0];
+        const wn=x=>esc(M[x.r==='W'?A.m:B.m].short), when=x=>`<a href="#season-${x.y}">${x.y} Wk ${x.wk}</a>`;
+        return `<div class="mx-lbl">Biggest moments</div><div class="tiles">
+          <div class="tile"><div class="k">Highest score</div><div class="v num">${f2(best.s)}</div><div class="sub">${esc(M[best.m].short)}, ${when(best.x)}</div></div>
+          <div class="tile"><div class="k">Lowest score</div><div class="v num">${f2(lo.s)}</div><div class="sub">${esc(M[lo.m].short)}, ${when(lo.x)}</div></div>
+          ${blow?`<div class="tile"><div class="k">Biggest blowout</div><div class="v num">+${f1(Math.abs(blow.ms-blow.os))}</div><div class="sub">${wn(blow)}, ${when(blow)}</div></div>`:''}
+          ${close?`<div class="tile"><div class="k">Closest game</div><div class="v num">+${f2(Math.abs(close.ms-close.os))}</div><div class="sub">${wn(close)}, ${when(close)}</div></div>`:''}</div>`;})()}
+      <div class="mx-lbl">Recent meetings</div><div class="rec-list">${L.slice().reverse().slice(0,8).map(x=>{const w=x.r==='W'?A.m:x.r==='L'?B.m:null; return `<div class="rec-row" style="grid-template-columns:90px 1fr auto"><span class="sub">${x.y} Wk ${x.wk}${x.po?' <span class="pill p-po">PO</span>':''}</span><span>${w!=null?`<b>${esc(M[w].short)}</b> won`:'Tie'}</span><a class="num" href="#season-${x.y}">${f2(x.ms)}–${f2(x.os)}</a></div>`;}).join('')}</div>
       ${L.length>8?`<p class="note">Most recent 8 of ${L.length} meetings.</p>`:''}</div>`;
   } else h2hHtml=`<div class="card"><h3>All-Time Head-to-Head</h3><p class="note">First ever meeting.</p></div>`;
   // rest of schedule
@@ -1629,7 +1705,7 @@ function vMatchup(aid,bid){
   // other games this week
   const others=up.filter(g=>g.wk===wk&&g!==game);
   const otherHtml=others.length?`<div class="mx-others">${others.map(g=>`<a href="#matchup-${g.ht.id}-${g.at.id}">${esc(M[g.ht.m].short)} vs ${esc(M[g.at.m].short)}</a>`).join('')}</div>`:'';
-  return `${hero}${stakes}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} Matchups</h3></div>${otherHtml}</div>`:''}`;
+  return `${hero}${stakes}${upset}<div class="mx-two">${tapeHtml}${h2hHtml}</div>${chart}${rest}${otherHtml?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} Matchups</h3></div>${otherHtml}</div>`:''}`;
 }
 // ----- League timeline -----
 function vTimeline(){
