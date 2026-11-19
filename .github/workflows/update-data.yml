@@ -33,13 +33,12 @@ jobs:
         run: python3 scripts/update_lineups.py
       - name: Commit if anything changed
         run: |
-          git add -N data/lineups.json 2>/dev/null || true
-          if git diff --quiet data/; then
+          git add data/
+          if git diff --cached --quiet; then
             echo "No new results."
           else
             git config user.name "bvffb-bot"
             git config user.email "bvffb-bot@users.noreply.github.com"
-            git add data/
             git commit -m "Refresh league data $(date -u +%Y-%m-%d)"
             git push
           fi
