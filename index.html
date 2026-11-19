@@ -434,6 +434,10 @@ main>.mx-two{gap:22px}
 .bk-link{display:block;padding:6px 10px;font-size:12px;font-weight:600;border-top:1px solid var(--line);text-decoration:none;color:var(--accent);background:var(--surface)}
 .mx-two>.card{display:flex;flex-direction:column}
 .mx-two .mx-tape{flex:1;justify-content:space-between}
+.sc-wks{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.sc-wk{display:flex;flex-direction:column;align-items:center;padding:6px 10px;border-radius:6px;font-size:12px;min-width:56px}
+.sc-wk span{color:var(--muted)}.sc-wk.us{background:var(--good-bg)}.sc-wk.espn{background:var(--soft)}
+.gm-up{color:var(--good)}.gm-dn{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -1571,7 +1575,7 @@ function recapCard(){
     <div class="ctrl"><label for="recap-wk">Week</label><select id="recap-wk">${weeks.map(w=>`<option value="${w}" ${w===wk?'selected':''}>Week ${w}</option>`).join('')}</select></div></div>
     <div class="sup-grid rc-tiles">${tiles}</div>
     ${heads.length?`<div class="rc-lbl">Headlines</div><div class="wire rc-wire">${heads.map(x=>`<div class="wire-item"><span class="wtag ${x.cls}">${x.tag}</span><span>${x.html}</span></div>`).join('')}</div>`:''}
-    <div class="rc-lbl">Results</div><div class="results rc-res">${wg.map(g=>`<div class="res">${side(g.wt,g.ws,!g.tie)}${side(g.lt,g.ls,false)}</div>`).join('')}</div></div>`;
+    <div class="rc-lbl">Results</div><div class="results rc-res">${wg.map(g=>`<div class="res">${side(g.wt,g.ws,!g.tie)}${side(g.lt,g.ls,false)}${S===curS?`<a class="bk-link" href="#game-${wk}-${g.ht.id}-${g.at.id}">Game recap ›</a>`:''}</div>`).join('')}</div></div>`;
 }
 
 // historical pre-game win chances (same idea as the live model, simplified), for upset context
@@ -1617,6 +1621,87 @@ function lineupCard(A,B,wk){
       <div class="tile"><div class="k">Position edges</div><div class="v num">${edges.a}–${edges.b}</div><div class="sub">${esc(M[A.m].short)} vs ${esc(M[B.m].short)}</div></div></div>
     <div class="lu">${hd}${rows.join('')}${ft}</div>
     <p class="note">ESPN's numbers are ESPN's own projections. Ours come from each player's recent games (recent weeks count more), pulled toward a typical starter at his position, with zero for byes and players ruled out and a discount for doubtful or questionable. In a 2026 backtest, ours missed by about 6.4 points per starter and ESPN's by 6.35. The arrow marks the edge at each spot using the average of both. Lineups refresh Thursday afternoon, Saturday night and Sunday morning, so late swaps may not show yet.</p></div>`;
+}
+// ----- Lineup alerts, projections scorecard, game recap pages -----
+function lineupAlerts(nextWk){
+  const L=window.LINEUPS; if(!L||L.y!==curS.y||L.wk!==nextWk) return '';
+  const bad=[], watch=[];
+  curS.list.forEach(t=>{(L.teams[t.id]||[]).forEach(r=>{const why=r.bye?'on bye':r.inj==='O'?'ruled out':r.inj==='IR'?'on IR':r.inj==='SSPD'?'suspended':r.inj==='D'?'doubtful':null;
+    if(why) bad.push({t,r,why}); else if(r.inj==='Q') watch.push({t,r});});});
+  const empty=curS.list.filter(t=>L.teams[t.id]&&L.teams[t.id].length<Object.values(L.teams).reduce((m,v)=>Math.max(m,v.length),0));
+  const upd=L.U?new Date(L.U).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}):'';
+  const row=x=>`<div class="rec-row" style="grid-template-columns:minmax(0,1fr) auto"><span>${mlink(x.t.m,M[x.t.m].short)} is starting <b>${esc(x.r.n)}</b> <span class="sub">${x.r.pos} · ${x.r.pro}</span></span><span class="pill ${x.why?'lu-bad':'lu-q'}">${x.why||'questionable'}</span></div>`;
+  return `<div class="card"><div class="head" style="margin-bottom:10px"><h3>Lineup Alerts</h3><span class="sub">Week ${L.wk} · as of ${upd}</span></div>
+    ${bad.length||empty.length?`<div class="rec-list">${bad.map(row).join('')}${empty.map(t=>`<div class="rec-row" style="grid-template-columns:minmax(0,1fr) auto"><span>${mlink(t.m,M[t.m].short)} has an empty starting spot</span><span class="pill lu-bad">empty</span></div>`).join('')}</div>`:'<p class="note" style="margin:0">Every starter is active. Nobody is starting a player on bye or ruled out.</p>'}
+    ${watch.length?`<div class="mx-lbl">Questionable starters</div><div class="rec-list">${watch.map(row).join('')}</div>`:''}</div>`;
+}
+function scorecard(){
+  const Wd=window.WEEKS; if(!Wd||Wd.y!==curS.y) return '';
+  const wks=Object.keys(Wd.weeks).map(Number).sort((a,b)=>a-b).filter(w=>w>=1); if(!wks.length) return '';
+  let tot={e:0,o:0,n:0}, weekWins={e:0,o:0,t:0}, picks={e:0,o:0,n:0}; const per=[];
+  wks.forEach(w=>{const T=Wd.weeks[w]; let e=0,o=0,n=0;
+    Object.values(T).forEach(x=>x.st.forEach(r=>{if(r[5]==null) return; e+=Math.abs(r[5]-r[4]); o+=Math.abs(r[6]-r[4]); n++;}));
+    tot.e+=e; tot.o+=o; tot.n+=n; const me=e/n, mo=o/n; if(Math.abs(me-mo)<.005) weekWins.t++; else if(me<mo) weekWins.e++; else weekWins.o++;
+    curS.games.filter(g=>g.wk===w&&!g.po&&!g.tie).forEach(g=>{const a=T[g.ht.id], b=T[g.at.id]; if(!a||!b) return; const sE=x=>sum(x.st.map(r=>r[5]||0)), sO=x=>sum(x.st.map(r=>r[6])); const hw=g.hs>g.as;
+      picks.n++; if((sE(a)>sE(b))===hw) picks.e++; if((sO(a)>sO(b))===hw) picks.o++;});
+    per.push({w,me,mo,snap:!!(Wd.snap&&Wd.snap[w])});});
+  const last=wks[wks.length-1], T=Wd.weeks[last];
+  const all=Object.entries(T).flatMap(([tid,x])=>x.st.filter(r=>r[5]!=null).map(r=>({tid:+tid,r,d:r[4]-r[5]})));
+  const boom=all.slice().sort((a,b)=>b.d-a.d)[0], bust=all.slice().sort((a,b)=>a.d-b.d)[0];
+  const who=x=>{const t=curS.list.find(t=>t.id===x.tid); return t?esc(M[t.m].short):'';};
+  const lead=tot.o/tot.n<tot.e/tot.n?'Us':'ESPN';
+  return `<div class="card"><div class="head" style="margin-bottom:12px"><h3>Projections Scorecard</h3><span class="sub">ESPN vs Us · ${CUR} starters</span></div>
+    <div class="tiles">
+      <div class="tile"><div class="k">Average miss per starter</div><div class="v num">${f1(tot.e/tot.n)} · ${f1(tot.o/tot.n)}</div><div class="sub">ESPN · Us. ${lead} leads</div></div>
+      <div class="tile"><div class="k">Weeks won</div><div class="v num">${weekWins.e}–${weekWins.o}${weekWins.t?'–'+weekWins.t:''}</div><div class="sub">ESPN–Us, closer on average</div></div>
+      <div class="tile"><div class="k">Winners picked</div><div class="v num">${picks.e} · ${picks.o}</div><div class="sub">ESPN · Us, of ${picks.n} games</div></div>
+      ${boom?`<div class="tile"><div class="k">Week ${last} boom</div><div class="v num">+${f1(boom.d)}</div><div class="sub">${esc(boom.r[1])} (${who(boom)}), ${f1(boom.r[4])} vs ${f1(boom.r[5])} proj.</div></div>`:''}
+      ${bust?`<div class="tile"><div class="k">Week ${last} bust</div><div class="v num">${f1(bust.d)}</div><div class="sub">${esc(bust.r[1])} (${who(bust)}), ${f1(bust.r[4])} vs ${f1(bust.r[5])} proj.</div></div>`:''}
+    </div>
+    <div class="sc-wks">${per.map(p=>`<div class="sc-wk ${p.mo<p.me?'us':'espn'}" title="Week ${p.w}: ESPN missed by ${f1(p.me)}, we missed by ${f1(p.mo)}${p.snap?'':' (our number rebuilt after the fact)'}"><span>Wk ${p.w}</span><b>${p.mo<p.me?'Us':'ESPN'}</b></div>`).join('')}</div>
+    <p class="note">Miss = how far a starter's projection was from what he scored. ${per.some(p=>!p.snap)?`Our numbers for Weeks ${per.filter(p=>!p.snap).map(p=>p.w).join(', ')} were rebuilt after the fact from the games before each week; from Week ${Math.max(...per.filter(p=>!p.snap).map(p=>p.w))+1} on, we lock in our projection before kickoff.`:'Our projections are locked in before kickoff each week.'}</p></div>`;
+}
+function vGame(wk,hid,aid){
+  const back=`<a class="chip" href="#now">‹ ${CUR} Season</a>`;
+  const g=curS.games.find(x=>x.wk===wk&&((x.ht.id===hid&&x.at.id===aid)||(x.ht.id===aid&&x.at.id===hid)));
+  if(!g) return `<div class="card">${back}<p class="note">Game not found.</p></div>`;
+  const Wd=window.WEEKS, T=Wd&&Wd.y===curS.y&&Wd.weeks[wk];
+  const A=g.ht, B=g.at, as=g.hs, bs=g.as;
+  const side=(t,s,al)=>`<div class="mx-side ${al}"><div class="mx-seed">${g.wt===t&&!g.tie?'Winner':g.tie?'Tie':'&nbsp;'}</div><div class="mx-tn">${esc(t.n)}</div><div>${mlink(t.m)}</div><div class="mx-p num ${g.wt===t&&!g.tie?'fav':''}">${f2(s)}</div></div>`;
+  const hero=`<div class="card mx-hero"><div class="mx-top">${back}<span class="pill p-live">Week ${wk} recap</span></div>
+    <div class="mx-grid">${side(A,as,'l')}<div class="mx-mid"><div class="mx-vs">final</div><div class="sub">${g.tie?'Tie':`${esc(M[g.wt.m].short)} by ${f2(g.margin)}`}</div></div>${side(B,bs,'r')}</div></div>`;
+  if(!T||!T[A.id]||!T[B.id]) return hero+`<div class="card"><p class="note" style="margin:0">${Wd?'Player scoring for this game is not available.':'Loading player scoring…'}</p></div>`;
+  const ra=T[A.id], rb=T[B.id];
+  const sE=x=>sum(x.st.map(r=>r[5]||0)), sO=x=>sum(x.st.map(r=>r[6]));
+  const slotName=sl=>(window.LINEUPS&&window.LINEUPS.slots&&window.LINEUPS.slots[sl])||({0:'QB',2:'RB',4:'WR',5:'WR/TE',6:'TE',16:'D/ST',17:'K',23:'FLEX'}[sl]||'');
+  const order=[...new Set([...ra.st,...rb.st].map(r=>r[0]))];
+  const cell=(r,al)=>r?`<div class="lu-p"><b>${esc(r[1])}</b><div class="sub">${r[2]} · ${r[3]} · proj ${r[5]!=null?f1(r[5]):'–'} / ${f1(r[6])}</div></div>`:'<div class="lu-p sub">Empty</div>';
+  const pts=(r,o)=>r?`<span class="num lu-n ${o&&r[4]>o[4]?'better':''}"><b>${f2(r[4])}</b></span>`:'<span class="lu-n">–</span>';
+  const delta=r=>r&&r[5]!=null?`<span class="num lu-n ${r[4]-r[5]>=0?'gm-up':'gm-dn'}">${r[4]-r[5]>=0?'+':''}${f1(r[4]-r[5])}</span>`:'<span class="lu-n"></span>';
+  const rows=[]; order.forEach(sl=>{const xa=ra.st.filter(r=>r[0]===sl), xb=rb.st.filter(r=>r[0]===sl); for(let k=0;k<Math.max(xa.length,xb.length);k++){const a=xa[k], b=xb[k];
+    rows.push(`<div class="lu-row"><div class="lu-side">${cell(a)}${delta(a)}${pts(a,b)}</div><div class="lu-slot">${slotName(sl)}</div><div class="lu-side r">${pts(b,a)}${delta(b)}${cell(b)}</div></div>`);}});
+  const hd=`<div class="lu-row lu-hd"><div class="lu-side"><span>${esc(M[A.m].short)}</span><span class="lu-n">vs ESPN</span><span class="lu-n">Pts</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="lu-n">Pts</span><span class="lu-n">vs ESPN</span><span>${esc(M[B.m].short)}</span></div></div>`;
+  const ft=`<div class="lu-row lu-tot"><div class="lu-side"><span>Total</span><span></span><span class="num lu-n">${f2(as)}</span></div><div class="lu-slot"></div><div class="lu-side r"><span class="num lu-n">${f2(bs)}</span><span></span><span></span></div></div>`;
+  const allP=[...ra.st.map(r=>({r,t:A})),...rb.st.map(r=>({r,t:B}))];
+  const mvp=allP.slice().sort((x,y)=>y.r[4]-x.r[4])[0], bust=allP.filter(x=>x.r[5]!=null).sort((x,y)=>(x.r[4]-x.r[5])-(y.r[4]-y.r[5]))[0], boom=allP.filter(x=>x.r[5]!=null).sort((x,y)=>(y.r[4]-y.r[5])-(x.r[4]-x.r[5]))[0];
+  const left=(x,s)=>Math.max(0,x.opt-s);
+  const loser=g.tie?null:g.lt, lx=loser===A?ra:rb, ws=g.tie?null:Math.max(as,bs);
+  const couldWin=loser&&lx.opt>ws;
+  const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div><div class="sub">${sub}</div></div>`;
+  const stats=`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Game Story</h3><span class="sub">Week ${wk}</span></div><div class="tiles">
+    ${tile('Player of the game',f2(mvp.r[4]),`${esc(mvp.r[1])} (${esc(M[mvp.t.m].short)})`)}
+    ${boom?tile('Biggest boom',`+${f1(boom.r[4]-boom.r[5])}`,`${esc(boom.r[1])} (${esc(M[boom.t.m].short)}) vs ESPN`):''}
+    ${bust?tile('Biggest bust',f1(bust.r[4]-bust.r[5]),`${esc(bust.r[1])} (${esc(M[bust.t.m].short)}) vs ESPN`):''}
+    ${tile('ESPN projected',`${f1(sE(ra))}–${f1(sE(rb))}`,`${esc(M[(sE(ra)>=sE(rb)?A:B).m].short)} favored · ${(sE(ra)>=sE(rb))===(as>=bs)?'got it right':'got it wrong'}`)}
+    ${tile('We projected',`${f1(sO(ra))}–${f1(sO(rb))}`,`${esc(M[(sO(ra)>=sO(rb)?A:B).m].short)} favored · ${(sO(ra)>=sO(rb))===(as>=bs)?'got it right':'got it wrong'}`)}
+    </div></div>`;
+  const bench=`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Bench Report</h3><span class="sub">best possible lineup, from the same roster</span></div><div class="tiles">
+    ${tile(`${esc(M[A.m].short)} left on the bench`,f2(left(ra,as)),`best possible ${f2(ra.opt)} · bench scored ${f2(ra.bench)}`)}
+    ${tile(`${esc(M[B.m].short)} left on the bench`,f2(left(rb,bs)),`best possible ${f2(rb.opt)} · bench scored ${f2(rb.bench)}`)}
+    </div>${loser?`<p class="note">${couldWin?`<b>${esc(M[loser.m].short)} could have won.</b> The best possible lineup scores ${f2(lx.opt)}, more than ${esc(M[g.wt.m].short)}'s ${f2(ws)}.`:`Even a perfect lineup wouldn't have saved ${esc(M[loser.m].short)}: ${f2(lx.opt)} vs ${f2(ws)}.`}</p>`:''}</div>`;
+  const others=curS.games.filter(x=>x.wk===wk&&x!==g&&!x.po);
+  return `${hero}${stats}<div class="card"><div class="head" style="margin-bottom:10px"><h3>Box Score</h3><a class="chip" href="#versus-${A.m}-${B.m}">Head-to-head history</a></div><div class="lu">${hd}${rows.join('')}${ft}</div><p class="note">Proj shows ESPN / ours before the game. "vs ESPN" is points above or below ESPN's projection.</p></div>${bench}
+    ${others.length?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>Other Week ${wk} Games</h3></div><div class="mx-others">${others.map(x=>`<a href="#game-${wk}-${x.ht.id}-${x.at.id}">${esc(M[x.wt.m].short)} over ${esc(M[x.lt.m].short)}</a>`).join('')}</div></div>`:''}`;
 }
 // ----- Matchup preview page -----
 function vMatchup(aid,bid){
@@ -2051,7 +2136,9 @@ function vNow(){
   <div class="head"><div><h2>${CUR} Season</h2><p class="lede">Through Week ${lastWk} of ${G}. ${esc(M[stand[0].m].short)} leads at ${rec(stand[0].w,stand[0].l,stand[0].t)}. ${G-lastWk>0?`${G-lastWk} week${G-lastWk>1?'s':''} left before the ${po}-team playoff.`:'Regular season is done.'}</p></div><a class="chip" href="#season-${CUR}">Every week's results</a></div>
   ${liveBracket()}
   ${recapCard()}
+  ${scorecard()}
   ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} ${isPO?'Playoff ':''}Matchups</h3><span class="sub">${NM.LW===nextWk?'Win chances from this week\'s lineups and '+CUR+' scoring':'Win chances from each team\'s '+CUR+' scoring'}</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
+  ${nextWk?lineupAlerts(nextWk):''}
   <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule. Each team's strength comes from this season's scoring (recent weeks count more), pulled slightly toward last season early on, with room for uncertainty. Tested against every season since 2015.${NM.LW!=null?` Week ${NM.LW} uses this week's starting lineups.`:''} Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
   <div class="grid2">
     <div class="card"><h3>Standings</h3><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">PF</th><th class="r">PA</th><th class="r">Strk</th></tr></thead><tbody>${standRows}</tbody></table></div><p class="note">Dashed line marks the playoff cut (top ${po}).</p></div>
@@ -2137,6 +2224,7 @@ function route(){
   if(h==='home'||h===''){g='home'; html=vHome();}
   else if(h==='now'){g='now'; html=vNow();}
   else if(h.startsWith('matchup')){g='now'; const p=h.split('-'); html=vMatchup(+p[1],+p[2]);}
+  else if(h.startsWith('game')){g='now'; const p=h.split('-'); html=vGame(+p[1],+p[2],+p[3]);}
   else if(h==='standings') html=vStandings();
   else if(h==='champions') html=vChampions();
   else if(h==='ratings') html=vRatings();
@@ -2177,7 +2265,8 @@ window.ROUTE=route; window.RESETNOW=()=>{NOWM=null; BSIM=null;};
 window.addEventListener('hashchange',()=>{route(); window.scrollTo(0,0);});
 route();
 };
-window.LINEUPS=null;
+window.LINEUPS=null; window.WEEKS=null;
+fetch("data/weeks.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{window.WEEKS=j; if(j&&window.ROUTE&&(location.hash.startsWith('#game')||location.hash==='#now')){const y=window.scrollY; window.ROUTE(); window.scrollTo(0,y);}}).catch(()=>{});
 fetch("data/lineups.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{window.LINEUPS=j; if(j&&window.ROUTE&&(location.hash.startsWith('#matchup')||location.hash==='#now')){window.RESETNOW&&window.RESETNOW(); const y=window.scrollY; window.ROUTE(); window.scrollTo(0,y);}}).catch(()=>{});
 fetch("data/league.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error(r.status);window.__LM=r.headers.get("last-modified");return r.json();}).then(d=>{try{window.BOOT(d); window.BOOTED=true;}catch(err){console.error(err);document.getElementById("app").innerHTML=`<div class="card"><h3>Something went wrong showing this page</h3><p class="note">${err.message}. Try another tab, or reload.</p></div>`;}}).catch(e=>{document.getElementById("app").innerHTML=`<div class="card"><h3>Could not load league data</h3><p class="note">data/league.json failed to load (${e.message}). If you opened this file directly from your computer, serve the folder instead, for example: python3 -m http.server</p></div>`;});
 </script>
