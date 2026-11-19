@@ -434,8 +434,16 @@ main>.mx-two{gap:22px}
 .bk-link{display:block;padding:6px 10px;font-size:12px;font-weight:600;border-top:1px solid var(--line);text-decoration:none;color:var(--accent);background:var(--surface)}
 .mx-two>.card{display:flex;flex-direction:column}
 .mx-two .mx-tape{flex:1;justify-content:space-between}
-.sc-wks{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.sc-wk{display:flex;flex-direction:column;align-items:center;padding:6px 10px;border-radius:6px;font-size:12px;min-width:56px}
+.sc-tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.sc-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 4px}
+.sc-two>div{display:flex;flex-direction:column;padding:6px 8px;border-radius:6px;background:var(--surface)}
+.sc-two span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.sc-two b{font-family:var(--display);font-size:24px;line-height:1.1}
+.sc-two .win{background:var(--good-bg)}.sc-two .win b{color:var(--good)}
+.sc-wks{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:6px}
+.sc-wk{display:flex;flex-direction:column;align-items:center;padding:6px 4px;border-radius:6px;font-size:12px}
+@media (max-width:1000px){.sc-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.sc-tiles{grid-template-columns:1fr 1fr}}
 .sc-wk span{color:var(--muted)}.sc-wk.us{background:var(--good-bg)}.sc-wk.espn{background:var(--soft)}
 .gm-up{color:var(--good)}.gm-dn{color:var(--bad)}
 </style>
@@ -1649,17 +1657,20 @@ function scorecard(){
   const all=Object.entries(T).flatMap(([tid,x])=>x.st.filter(r=>r[5]!=null).map(r=>({tid:+tid,r,d:r[4]-r[5]})));
   const boom=all.slice().sort((a,b)=>b.d-a.d)[0], bust=all.slice().sort((a,b)=>a.d-b.d)[0];
   const who=x=>{const t=curS.list.find(t=>t.id===x.tid); return t?esc(M[t.m].short):'';};
-  const lead=tot.o/tot.n<tot.e/tot.n?'Us':'ESPN';
-  return `<div class="card"><div class="head" style="margin-bottom:12px"><h3>Projections Scorecard</h3><span class="sub">ESPN vs Us · ${CUR} starters</span></div>
-    <div class="tiles">
-      <div class="tile"><div class="k">Average miss per starter</div><div class="v num">${f1(tot.e/tot.n)} · ${f1(tot.o/tot.n)}</div><div class="sub">ESPN · Us. ${lead} leads</div></div>
-      <div class="tile"><div class="k">Weeks won</div><div class="v num">${weekWins.e}–${weekWins.o}${weekWins.t?'–'+weekWins.t:''}</div><div class="sub">ESPN–Us, closer on average</div></div>
-      <div class="tile"><div class="k">Winners picked</div><div class="v num">${picks.e} · ${picks.o}</div><div class="sub">ESPN · Us, of ${picks.n} games</div></div>
-      ${boom?`<div class="tile"><div class="k">Week ${last} boom</div><div class="v num">+${f1(boom.d)}</div><div class="sub">${esc(boom.r[1])} (${who(boom)}), ${f1(boom.r[4])} vs ${f1(boom.r[5])} proj.</div></div>`:''}
-      ${bust?`<div class="tile"><div class="k">Week ${last} bust</div><div class="v num">${f1(bust.d)}</div><div class="sub">${esc(bust.r[1])} (${who(bust)}), ${f1(bust.r[4])} vs ${f1(bust.r[5])} proj.</div></div>`:''}
+  const cmp=(k,e,o,fmt,lowWins,sub)=>{const eW=lowWins?e<o:e>o, oW=lowWins?o<e:o>e;
+    return `<div class="tile"><div class="k">${k}</div><div class="sc-two"><div class="${eW?'win':''}"><span>ESPN</span><b class="num">${fmt(e)}</b></div><div class="${oW?'win':''}"><span>Us</span><b class="num">${fmt(o)}</b></div></div><div class="sub">${sub}</div></div>`;};
+  const rebuilt=per.filter(p=>!p.snap).map(p=>p.w);
+  return `<div class="card" id="scorecard"><div class="head" style="margin-bottom:12px"><h3>Projections Scorecard</h3><span class="sub">ESPN vs Us · ${CUR} starters</span></div>
+    <div class="sc-tiles">
+      ${cmp('Average miss per starter',tot.e/tot.n,tot.o/tot.n,f1,true,'points off, lower is better')}
+      ${cmp('Weeks won',weekWins.e,weekWins.o,v=>v,false,'closer on average that week')}
+      ${cmp('Winners picked',picks.e,picks.o,v=>v,false,`of ${picks.n} games`)}
+      ${boom?`<div class="tile"><div class="k">Week ${last} boom</div><div class="v num gm-up">+${f1(boom.d)}</div><div class="sub">${esc(boom.r[1])} (${who(boom)}) · ${f1(boom.r[4])} vs ${f1(boom.r[5])}</div></div>`:''}
+      ${bust?`<div class="tile"><div class="k">Week ${last} bust</div><div class="v num gm-dn">${f1(bust.d)}</div><div class="sub">${esc(bust.r[1])} (${who(bust)}) · ${f1(bust.r[4])} vs ${f1(bust.r[5])}</div></div>`:''}
     </div>
-    <div class="sc-wks">${per.map(p=>`<div class="sc-wk ${p.mo<p.me?'us':'espn'}" title="Week ${p.w}: ESPN missed by ${f1(p.me)}, we missed by ${f1(p.mo)}${p.snap?'':' (our number rebuilt after the fact)'}"><span>Wk ${p.w}</span><b>${p.mo<p.me?'Us':'ESPN'}</b></div>`).join('')}</div>
-    <p class="note">Miss = how far a starter's projection was from what he scored. ${per.some(p=>!p.snap)?`Our numbers for Weeks ${per.filter(p=>!p.snap).map(p=>p.w).join(', ')} were rebuilt after the fact from the games before each week; from Week ${Math.max(...per.filter(p=>!p.snap).map(p=>p.w))+1} on, we lock in our projection before kickoff.`:'Our projections are locked in before kickoff each week.'}</p></div>`;
+    <div class="mx-lbl">Week by week</div>
+    <div class="sc-wks">${per.map(p=>`<div class="sc-wk ${p.mo<p.me?'us':'espn'}" title="Week ${p.w}: ESPN missed by ${f1(p.me)}, we missed by ${f1(p.mo)}"><span>Wk ${p.w}</span><b>${p.mo<p.me?'Us':'ESPN'}</b></div>`).join('')}</div>
+    ${rebuilt.length?`<p class="note">Our Week ${rebuilt.length>1?`${rebuilt[0]}–${rebuilt[rebuilt.length-1]}`:rebuilt[0]} numbers were rebuilt after the fact. From Week ${rebuilt[rebuilt.length-1]+1} on, they're locked in before kickoff.</p>`:''}</div>`;
 }
 function vGame(wk,hid,aid){
   const back=`<a class="chip" href="#now">‹ ${CUR} Season</a>`;
@@ -2137,6 +2148,7 @@ function vNow(){
   ${liveBracket()}
   ${recapCard()}
   ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} ${isPO?'Playoff ':''}Matchups</h3><span class="sub">${NM.LW===nextWk?'Win chances from this week\'s lineups and '+CUR+' scoring':'Win chances from each team\'s '+CUR+' scoring'}</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
+  ${scorecard()}
   ${nextWk?lineupAlerts(nextWk):''}
   <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule. Each team's strength comes from this season's scoring (recent weeks count more), pulled slightly toward last season early on, with room for uncertainty. Tested against every season since 2015.${NM.LW!=null?` Week ${NM.LW} uses this week's starting lineups.`:''} Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
   <div class="grid2">
@@ -2155,8 +2167,7 @@ function vNow(){
     <div class="card"><h3>Heating Up</h3><div class="rec-list">${hot.map(c=>sRow(c,'pos')).join('')||'<p class="note">Nobody on a win streak.</p>'}</div></div>
     <div class="card"><h3>Ice Cold</h3><div class="rec-list">${cold.map(c=>sRow(c,'neg')).join('')||'<p class="note">Nobody on a skid.</p>'}</div></div>
     <div class="card"><h3>Luck Meter</h3><div class="rec-list">${luck.slice(0,2).map(lk).join('')}${luck.slice(-2).map(lk).join('')}</div><p class="note">Wins above or below what All-Play scoring predicts. Two luckiest, two unluckiest.</p></div>
-  </div>
-  ${scorecard()}`;
+  </div>`;
 }
 
 // ----- footer -----
