@@ -1634,17 +1634,33 @@ function nowModel(){
   reg.forEach(g=>{sc[g.ht.id].push({wk:g.wk,s:g.hs,o:g.as,op:g.at,g}); sc[g.at.id].push({wk:g.wk,s:g.as,o:g.hs,op:g.ht,g});});
   list.forEach(t=>sc[t.id].sort((a,b)=>a.wk-b.wk));
   const allS=reg.flatMap(g=>[g.hs,g.as]), lgM=avg(allS), lgSd=sd(allS);
-  const model={}; list.forEach(t=>{const a=sc[t.id].map(x=>x.s), n=a.length, m=n?avg(a):lgM, s=n>1?sd(a):lgSd;
-    model[t.id]={mu:(n*m+3*lgM)/(n+3), sig:Math.sqrt((n*s*s+4*lgSd*lgSd)/(n+4))};});
+  // Scoring model (tuned on a backtest of 2015-2025, checked weekly from Week 4 on):
+  // recent weeks count more, early-season numbers are pulled toward the league average,
+  // last season's scoring nudges that starting point, and we stay honest about not
+  // knowing each team's true level yet.
+  const K=10, KS=4, REC=.9, HIST=.3, UNC=1.5;
+  const prevS=SEASONS[S.y-1], prevReg=prevS?prevS.games.filter(g=>!g.po&&!g.multi):[];
+  const prevLg=prevReg.length?avg(prevReg.flatMap(g=>[g.hs,g.as])):NaN;
+  const prevRatio=m=>{if(!prevReg.length) return 1; const v=prevReg.flatMap(g=>g.h===m?[g.hs]:g.a===m?[g.as]:[]); return v.length?avg(v)/prevLg:1;};
+  const resid=[]; list.forEach(t=>{const a=sc[t.id].map(x=>x.s); if(a.length){const m=avg(a); a.forEach(v=>resid.push(v-m));}});
+  const dof=allS.length-list.filter(t=>sc[t.id].length).length;
+  const wSd=dof>0?Math.sqrt(sum(resid.map(r=>r*r))/dof):lgSd;
+  const model={}; list.forEach(t=>{const a=sc[t.id], n=a.length;
+    let sw=0,sv=0; a.forEach(x=>{const w=Math.pow(REC,lastWk-x.wk); sw+=w; sv+=w*x.s;});
+    const m=sw?sv/sw:lgM, pm=lgM*(1+HIST*(prevRatio(t.m)-1));
+    const s=n>1?sd(a.map(x=>x.s)):wSd;
+    const mu=(n*m+K*pm)/(n+K), sig=Math.sqrt((n*s*s+KS*wSd*wSd)/(n+KS));
+    model[t.id]={mu,sig,se:UNC*sig/Math.sqrt(n+K)};});
   const up=S.upcoming.filter(g=>g.wk<=G).sort((a,b)=>a.wk-b.wk);
   const remaining={}; list.forEach(t=>remaining[t.id]=up.filter(g=>g.ht===t||g.at===t).map(g=>g.ht===t?g.at:g.ht));
-  const winP=(a,b)=>Phi((model[a.id].mu-model[b.id].mu)/Math.sqrt(model[a.id].sig**2+model[b.id].sig**2));
+  const winP=(a,b)=>{const A=model[a.id],B=model[b.id]; return Phi((A.mu-B.mu)/Math.sqrt(A.sig**2+B.sig**2+A.se**2+B.se**2));};
   // simulation
   let seed=20261111; const rnd=()=>{seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296;};
   const norm=()=>{let u=0,v=0; while(!u)u=rnd(); while(!v)v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
-  const draw=id=>model[id].mu+model[id].sig*norm();
-  const N=6000, res={}; list.forEach(t=>res[t.id]={po:0,bye:0,title:0,final:0,w:0,pf:0,seed:0});
+  let MU={}; const draw=id=>MU[id]+model[id].sig*norm();
+  const N=10000, res={}; list.forEach(t=>res[t.id]={po:0,bye:0,title:0,final:0,w:0,pf:0,seed:0});
   for(let k=0;k<N;k++){
+    MU={}; list.forEach(t=>MU[t.id]=model[t.id].mu+model[t.id].se*norm());
     const W={},PF={}; list.forEach(t=>{W[t.id]=t.w+t.t/2; PF[t.id]=t.pf;});
     up.forEach(g=>{const a=draw(g.ht.id),b=draw(g.at.id); PF[g.ht.id]+=a; PF[g.at.id]+=b; if(a>b)W[g.ht.id]++; else W[g.at.id]++;});
     const order=list.map(t=>t.id).sort((x,y)=>W[y]-W[x]||PF[y]-PF[x]);
@@ -1777,7 +1793,7 @@ function vNow(){
   ${liveBracket()}
   ${recapCard()}
   ${nextWk?`<div class="card"><div class="head" style="margin-bottom:12px"><h3>Week ${nextWk} Matchups</h3><span class="sub">Win chances from each team's ${CUR} scoring</span></div><div class="mu-grid">${nextGames.map(muCard).join('')}</div></div>`:''}
-  <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule, using each team's scoring this season. Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
+  <div class="card"><div class="head" style="margin-bottom:8px"><div><h3>Playoff Odds</h3><p class="note" style="margin:4px 0 0">${N.toLocaleString()} simulations of the remaining schedule. Each team's strength comes from this season's scoring (recent weeks count more), pulled slightly toward last season early on, with room for uncertainty. Tested against every season since 2015. Top ${po} make it, top 2 get a bye. Status checks every possible outcome; ties are broken by points.</p></div></div>${table('t-odds',oddsCols,odds,'po','desc')}</div>
   <div class="grid2">
     <div class="card"><h3>Standings</h3><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">PF</th><th class="r">PA</th><th class="r">Strk</th></tr></thead><tbody>${standRows}</tbody></table></div><p class="note">Dashed line marks the playoff cut (top ${po}).</p></div>
     <div class="card"><h3>Power Rankings</h3><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="r">Move</th><th class="pin">Team</th><th class="r">W-L</th><th class="r">All-Play</th><th class="r">Last 3</th></tr></thead><tbody>${prRows}</tbody></table></div><p class="note">Blends record, All-Play and the last three weeks of scoring. Movement is since Week ${Math.max(1,lastWk-1)}.</p></div>
