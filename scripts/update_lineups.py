@@ -15,6 +15,7 @@ from pathlib import Path
 
 LEAGUE_ID = int(os.environ.get("LEAGUE_ID", "1068706"))
 OUT = Path(__file__).resolve().parent.parent / "data" / "lineups.json"
+WEEKS = Path(__file__).resolve().parent.parent / "data" / "weeks.json"
 BASE = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl"
 
 POS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "D/ST"}
@@ -50,9 +51,20 @@ def main():
         return
 
     ros = get(f"{lg}?view=mRoster&view=mMatchup&scoringPeriodId={wk}")
+    slot_counts = {int(k): v for k, v in settings["settings"]["rosterSettings"]["lineupSlotCounts"].items() if v and int(k) not in BENCH}
+    # box scores for every finished week this season (starters' actual points and ESPN's pregame projection)
+    boxes = {}
+    for w in range(1, wk):
+        b = get(f"{lg}?view=mBoxscore&view=mMatchupScore&scoringPeriodId={w}")
+        boxes[w] = [m for m in b.get("schedule", []) if m.get("matchupPeriodId") == w and m.get("away")]
     pro = {p["id"]: p for p in get(f"{BASE}/seasons/{year}?view=proTeamSchedules_wl")["settings"]["proTeams"]}
 
-    ids = [e["playerId"] for t in ros["teams"] for e in t["roster"]["entries"]]
+    ids = {e["playerId"] for t in ros["teams"] for e in t["roster"]["entries"]}
+    for ms in boxes.values():
+        for m in ms:
+            for side in (m["home"], m["away"]):
+                ids |= {e["playerId"] for e in (side.get("rosterForCurrentScoringPeriod") or {}).get("entries", [])}
+    ids = sorted(ids)
     hist = get(f"{lg}?view=kona_player_info", {"players": {"filterIds": {"value": ids},
                "filterStatsForTopScoringPeriodIds": {"value": 17, "additionalValue": [f"00{year}", f"10{year}"]}}})
     games = {}
@@ -73,12 +85,13 @@ def main():
         top = sorted(v, reverse=True)[:max(1, round(len(v) / 2))]
         pos_mean[k] = sum(top) / len(top)
 
-    def ours(pid, pos):
+    def ours(pid, pos, target=None):
+        target = target or wk
         sw = sv = 0.0
         for (y, w, v) in games.get(pid, []):
-            if y == year and w >= wk:
+            if y == year and w >= target:
                 continue
-            age = (wk - w) if y == year else (wk + 18 - w)
+            age = (target - w) if y == year else (target + 18 - w)
             wt = DECAY ** age * (LAST_SEASON if y != year else 1.0)
             sw += wt
             sv += wt * v
@@ -124,8 +137,61 @@ def main():
     old = json.loads(OUT.read_text()) if OUT.exists() else {}
     new["U"] = old.get("U") if {k: v for k, v in old.items() if k != "U"} == new else \
         datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # keep last week's final pregame snapshot of our projections before overwriting
+    snaps = {}
+    old_weeks = json.loads(WEEKS.read_text()) if WEEKS.exists() else {}
+    if old_weeks.get("y") == year:
+        snaps = old_weeks.get("snap", {})
+    if old.get("y") == year and old.get("wk") and old["wk"] < wk:
+        snaps[str(old["wk"])] = {tid: {r["n"]: r["ours"] for r in rows} for tid, rows in old.get("teams", {}).items()}
     OUT.write_text(json.dumps(new, separators=(",", ":")))
-    print(f"Week {wk}: {sum(len(v) for v in out_teams.values())} starters written.")
+
+    # finished weeks: starters with actual, ESPN and our projection; bench and best-possible points
+    def proj_of(pl, w, src):
+        return next((s["appliedTotal"] for s in pl.get("stats", []) if s.get("scoringPeriodId") == w
+                     and s.get("statSourceId") == src and s.get("statSplitTypeId") == 1), None)
+
+    def optimal(entries, w):
+        pool = [(proj_of(e["playerPoolEntry"]["player"], w, 0) or 0.0, set(e["playerPoolEntry"]["player"].get("eligibleSlots", [])), i)
+                for i, e in enumerate(entries)]
+        used, total = set(), 0.0
+        for sl in sorted(slot_counts, key=lambda k: (k == 23 or k == 7, k)):  # flex-type slots last
+            for _ in range(slot_counts[sl]):
+                best = max((p for p in pool if p[2] not in used and sl in p[1]), default=None, key=lambda p: p[0])
+                if best:
+                    used.add(best[2])
+                    total += best[0]
+        return round(total, 2)
+
+    weeks = {}
+    for w, ms in boxes.items():
+        wt = {}
+        snap = snaps.get(str(w))
+        for m in ms:
+            for side in (m["home"], m["away"]):
+                entries = (side.get("rosterForCurrentScoringPeriod") or {}).get("entries", [])
+                st, bench = [], 0.0
+                for e in entries:
+                    pl = e["playerPoolEntry"]["player"]
+                    act = proj_of(pl, w, 0) or 0.0
+                    if e["lineupSlotId"] in BENCH:
+                        bench += act
+                        continue
+                    esp = proj_of(pl, w, 1)
+                    pos = pl["defaultPositionId"]
+                    bye = pro.get(pl.get("proTeamId"), {}).get("byeWeek") == w
+                    if snap and str(side["teamId"]) in snap and pl["fullName"] in snap[str(side["teamId"])]:
+                        mine = snap[str(side["teamId"])][pl["fullName"]]
+                    else:
+                        # rebuilt after the fact: ESPN's 0 stands in for players known to be out
+                        mine = 0.0 if bye or esp == 0 else ours(e["playerId"], pos, w)
+                    st.append([e["lineupSlotId"], pl["fullName"], POS.get(pos, "?"), pro.get(pl.get("proTeamId"), {}).get("abbrev", "FA"),
+                               round(act, 2), None if esp is None else round(esp, 1), round(mine, 1)])
+                st.sort(key=lambda r: (SLOT_ORDER.index(r[0]) if r[0] in SLOT_ORDER else 99, -r[4]))
+                wt[str(side["teamId"])] = {"st": st, "bench": round(bench, 2), "opt": optimal(entries, w)}
+        weeks[str(w)] = wt
+    WEEKS.write_text(json.dumps({"y": year, "snap": snaps, "weeks": weeks}, separators=(",", ":")))
+    print(f"Week {wk}: {sum(len(v) for v in out_teams.values())} starters written; {len(weeks)} finished weeks.")
 
 
 if __name__ == "__main__":
