@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pull draft, trade and player-level history from ESPN and write data/history.json.
 
-  D  drafts, every season:        {year: [[overall, round, teamId, playerId, seasonPoints, keeper], ...]}
+  D  drafts, every season:        {year: [[overall, round, teamId, playerId, seasonPoints, keeper, auctionPrice], ...]}
   T  trades (ESPN keeps these from 2018 on): [[year, week, "YYYY-MM-DD", [[playerId, fromTeam, toTeam, startedPts, totalPts, starts], ...]], ...]
      startedPts / totalPts / starts are what the player did for his new team for the rest of that season.
   W  top single-week starter performances (2018 on): [[year, week, teamId, playerId, points, slot], ...]
@@ -51,7 +51,8 @@ def main():
 
     old = json.loads(OUT.read_text()) if OUT.exists() else {}
     P = old.get("P", {})
-    D = {k: v for k, v in old.get("D", {}).items() if int(k) < cur}
+    # finished drafts are kept; rows from before bids were stored (6 fields) are pulled again
+    D = {k: v for k, v in old.get("D", {}).items() if int(k) < cur and v and len(v[0]) >= 7}
     T = [t for t in old.get("T", []) if t[0] < cur]
     Wk = [w for w in old.get("W", []) if w[0] < cur]
     R = [r for r in old.get("R", []) if r[0] < cur]
@@ -77,7 +78,7 @@ def main():
             pts[pl.get("id")] = next((s.get("appliedTotal", 0) for s in pl.get("stats", [])
                                       if s.get("seasonId") == y and s.get("statSourceId") == 0 and s.get("statSplitTypeId") == 0), 0)
         D[str(y)] = [[p["overallPickNumber"], p["roundId"], p["teamId"], p["playerId"], round(pts.get(p["playerId"], 0) or 0, 1),
-                      1 if p.get("keeper") else 0] for p in sorted(dd, key=lambda p: p["overallPickNumber"])]
+                      1 if p.get("keeper") else 0, p.get("bidAmount") or 0] for p in sorted(dd, key=lambda p: p["overallPickNumber"])]
         print(f"draft {y}: {len(dd)} picks")
 
     # ---- box scores (who started, who scored) and trades, 2018 on
