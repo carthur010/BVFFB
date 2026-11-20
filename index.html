@@ -478,6 +478,14 @@ details.how{margin-top:10px}details.how summary{cursor:pointer;font-size:13px;co
 .grid4p{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
 @media (max-width:1000px){.grid4p{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:600px){.grid4p{grid-template-columns:1fr}}
+.db-mob{display:none}
+@media (max-width:700px){.db-wrap{display:none}.db-mob{display:block}}
+.db-mob .db-db-g1,.db-mob .db-db-g2{background:var(--good-bg)}.db-mob .db-db-r1,.db-mob .db-db-r2{background:var(--bad-bg)}
+.as-bar{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--soft)}.as-bar i{display:block;height:100%}
+.fd-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px}
+.fd-y{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:8px;background:var(--soft);text-decoration:none;color:var(--ink);font-size:13px}
+.fd-y>span:first-child{font-weight:700}.fd-y .grade{align-self:flex-start;font-size:13px;padding:1px 6px}.fd-y .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-tile{text-decoration:none;color:var(--ink)}.tx-tile .v{font-family:var(--display);font-size:20px;font-weight:700}.tx-tile:hover{outline:1px solid var(--accent)}
 </style>
 </head>
 <body>
@@ -1333,6 +1341,7 @@ function vFranchise(i){
     <div class="card"><h3>Points Per Game by Season</h3>${rel}<div class="legend"><span style="--c:var(--accent)">Beat the league average</span><span style="--c:var(--muted)">Below average</span><span style="--c:var(--ink)">League average (dashed)</span></div><p class="note">Above the league average in ${above} of ${c.teams.length} seasons.</p></div>
   </div>
   ${bestWorst(c)}
+  ${franchiseDraft(c)}
   <div class="card"><h3>Season by Season</h3>${table('t-flog',cols,c.teams.slice().reverse(),'y','desc')}</div>
   <div class="card"><h3>Rivalries</h3>
     <div class="tiles" style="margin-bottom:14px">
@@ -1763,8 +1772,10 @@ function vGame(wk,hid,aid){
 const histWait=title=>{window.needHist(); return `<div class="card"><h3>${title}</h3><p class="note" style="margin:0">Loading…</p></div>`;};
 const pName=id=>{const p=window.HIST.P[id]; return p?p[0]:'Unknown';}, pPos=id=>{const p=window.HIST.P[id]; return p?p[1]:'';};
 const tMgr=(y,tid)=>{const t=SEASONS[y]&&SEASONS[y].teams[tid]; return t?t.m:null;};
-const txNav=on=>`<div class="subtabs"><a class="chip ${on==='draft'?'on':''}" href="#draft">Draft</a><a class="chip ${on==='trades'?'on':''}" href="#trades">Trades</a></div>`;
-let DRAFTS=null;
+const txNav=on=>`<div class="subtabs"><a class="chip ${on==='draft'?'on':''}" href="#draft">Draft</a><a class="chip ${on==='trades'?'on':''}" href="#trades">Trades</a><a class="chip ${on==='waivers'?'on':''}" href="#waivers">Waivers</a></div>`;
+let TRADE_F='all';
+let DRAFTS=null, STARTS=null;
+const STARTS_BY=()=>{ if(STARTS) return STARTS; STARTS={}; (window.HIST.R||[]).forEach(r=>{(STARTS[r[0]]=STARTS[r[0]]||{})[r[1]+'-'+r[2]]=r[4];}); return STARTS; };
 function draftModel(){
   if(DRAFTS) return DRAFTS; const H=window.HIST; DRAFTS={};
   Object.entries(H.D).forEach(([ys,picks])=>{const y=+ys, S=SEASONS[y]; if(!S) return; const n=S.list.length;
@@ -1779,7 +1790,10 @@ function draftModel(){
     // kickers and defenses are drafted late by habit, so value is ranked among QB/RB/WR/TE only
     const sk=rows.filter(r=>r.skill); sk.slice().sort((a,b)=>mode==='auction'?(b.bid-a.bid||a.ov-b.ov):a.ov-b.ov).forEach((r,i)=>r.pickRank=i+1); sk.slice().sort((a,b)=>b.par-a.par).forEach((r,i)=>r.parRank=i+1);
     rows.forEach(r=>{r.value=r.skill&&mode!=='noprice'?r.pickRank-r.parRank:0; r.scored=r.skill&&mode!=='noprice';});
-    const teams={}; rows.forEach(r=>{const t=teams[r.tid]=teams[r.tid]||{tid:r.tid,m:r.m,par:0,pts:0,spent:0,picks:[]}; if(r.skill) t.par+=Math.max(r.par,0); t.pts+=r.pts; t.spent+=r.bid; t.picks.push(r);});
+    // from 2018 on, a pick only counts what he scored in the drafting team's own lineup
+    const own=y>=2018?STARTS_BY()[y]||null:null;
+    rows.forEach(r=>{r.forTeam=own?(own[r.tid+'-'+r.pid]||0):null;});
+    const teams={}; rows.forEach(r=>{const t=teams[r.tid]=teams[r.tid]||{tid:r.tid,m:r.m,par:0,pts:0,spent:0,picks:[]}; if(own) t.par+=r.forTeam; else if(r.skill) t.par+=Math.max(r.par,0); t.pts+=own?r.forTeam:r.pts; t.spent+=r.bid; t.picks.push(r);});
     const tl=Object.values(teams).sort((a,b)=>b.par-a.par); tl.forEach((t,i)=>{t.rank=i+1; const q=tl.length>1?(tl.length-1-i)/(tl.length-1):1; t.grade=q>=.9?'A+':q>=.75?'A':q>=.6?'B+':q>=.45?'B':q>=.3?'C+':q>=.15?'C':'D';});
     // board slots: position within the round, snake order (picks can be traded, so slot != team)
     const nT=rows.filter(r=>r.rd===1).length; const rounds=Math.max(...rows.map(r=>r.rd));
@@ -1787,7 +1801,7 @@ function draftModel(){
     const snake=mode==='snake'&&new Set(r1).size===r1.length&&r2.join()===r1.slice().reverse().join();
     for(let rd=1;rd<=rounds;rd++){const rr=rows.filter(r=>r.rd===rd).sort((a,b)=>a.ov-b.ov); rr.forEach((r,k)=>{r.slot=snake&&rd%2===0?nT-1-k:k;});}
     const order=snake?r1:null;
-    DRAFTS[y]={y,rows,teams:tl,order,snake,nT,rounds,mode,live:!S.complete};});
+    DRAFTS[y]={y,rows,teams:tl,order,snake,nT,rounds,mode,own:!!own,live:!S.complete};});
   return DRAFTS;
 }
 function vDraft(ys){
@@ -1816,6 +1830,7 @@ function vDraft(ys){
       <div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Manager</th><th class="r">Drafts</th><th class="r">A grades</th><th class="r">Avg draft finish</th>${bands.map(b=>`<th class="r">${b[2]}</th>`).join('')}</tr></thead><tbody>
       ${mrows.map((b,i)=>`<tr><td class="r num">${i+1}</td><td class="pin">${mlink(b.m)}</td><td class="r num">${b.n}</td><td class="r num">${b.As}</td><td class="r num">${f0(b.avg*100)}%</td>${b.band.map(cell).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="note">Avg draft finish: where their draft ranked each year, as a share of the league (lower is better). Round columns: average picks gained or lost versus where the player finished. Green is a good round for that manager.</p></div>
+    ${draftTrends(DM)}
     ${draftMethod()}`;
   }
   const D=DM[y], S=SEASONS[y];
@@ -1833,18 +1848,119 @@ function vDraft(ys){
   const rosterBoard=()=>{const ts=D.teams.slice().sort((a,b)=>a.rank-b.rank); const per=ts.map(t=>t.picks.slice().sort((a,b)=>D.mode==='auction'?(b.bid-a.bid||a.ov-b.ov):(b.pts-a.pts))); const n=Math.max(...per.map(p=>p.length));
     return `<div class="db-wrap"><div class="db" style="grid-template-columns:44px repeat(${ts.length},minmax(96px,1fr))"><div></div>${ts.map(t=>`<div class="db-h">${esc(M[t.m]?.short||'?')}${D.mode==='auction'?`<br><span style="font-weight:600">$${t.spent}</span>`:''}</div>`).join('')}
       ${Array.from({length:n},(_,i)=>`<div class="db-rd">${i+1}</div>${per.map(p=>{const r=p[i]; return r?`<div class="db-c ${cls(r)}" title="${esc(pName(r.pid))}${r.bid?' · $'+r.bid:''} · ${f1(r.pts)} pts${r.scored?` · finished ${ord(r.parRank)} in value`:''}"><b>${esc(pName(r.pid))}</b><span>${r.pos}${r.bid?' · $'+r.bid:''} · ${f0(r.pts)}${r.keeper?' · K':''}</span></div>`:'<div class="db-c"></div>';}).join('')}`).join('')}</div></div>`;};
+  const mob=(()=>{const ts=D.teams.slice().sort((a,b)=>a.rank-b.rank);
+    return `<div class="db-mob"><div class="ctrl" style="margin-bottom:8px"><label for="db-team">Team</label><select id="db-team">${ts.map((t,i)=>`<option value="${t.tid}">${esc(S.teams[t.tid].n)} (${esc(M[t.m]?.short||'')})</option>`).join('')}</select></div>
+      ${ts.map((t,i)=>`<div class="rec-list db-ml" data-t="${t.tid}" ${i?'hidden':''}>${t.picks.slice().sort((a,b)=>D.mode==='auction'?(b.bid-a.bid):(a.ov-b.ov)).map(r=>`<div class="rec-row db-${cls(r)||'n'}" style="grid-template-columns:52px 1fr auto"><span class="sub">${D.mode==='auction'?'$'+r.bid:'Rd '+r.rd}</span><span><b>${esc(pName(r.pid))}</b> <span class="sub">${r.pos}${r.keeper?' · keeper':''}</span></span><span class="num">${f0(r.pts)}</span></div>`).join('')}</div>`).join('')}</div>`;})();
   const board=D.mode!=='snake'?rosterBoard():`<div class="db-wrap"><div class="db" style="grid-template-columns:44px repeat(${D.nT},minmax(96px,1fr))"><div></div>${cols.map(si=>`<div class="db-h">${D.snake?esc(M[tMgr(y,D.order[si])]?.short||'?'):'Pick '+(si+1)}</div>`).join('')}
     ${Array.from({length:D.rounds},(_,i)=>i+1).map(rd=>`<div class="db-rd">R${rd}</div>${cols.map(si=>{const tid=D.snake?D.order[si]:null; const r=D.rows.find(x=>x.rd===rd&&x.slot===si); return r?`<div class="db-c ${cls(r)}" title="${esc(pName(r.pid))} · pick ${r.ov} by ${esc(M[r.m]?.short||'?')} · ${f1(r.pts)} pts${r.skill?` · finished ${ord(r.parRank)} in value`:''}"><b>${esc(pName(r.pid))}</b><span>${r.pos} · ${f0(r.pts)}${r.keeper?' · K':''}${!D.snake?` · ${esc(M[r.m]?.short||'?')}`:r.tid!==tid?` · <i>${esc(M[r.m]?.short||'?')}</i>`:''}</span></div>`:'<div class="db-c"></div>';}).join('')}`).join('')}</div></div>`;
-  const grades=`<div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">Grade</th>${D.mode==='auction'?'<th class="r">Spent</th>':''}<th class="r">Points from picks</th>${D.mode==='noprice'?'<th>Top scorer</th>':'<th>Best pick</th><th>Worst early pick</th>'}</tr></thead><tbody>${D.teams.map(t=>{const b=t.picks.filter(r=>r.scored).sort((a,b)=>b.value-a.value)[0], w=t.picks.filter(r=>r.scored&&r.rd<=4).sort((a,b)=>a.value-b.value)[0];
+  const grades=`<div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">Grade</th>${D.mode==='auction'?'<th class="r">Spent</th>':''}<th class="r">${D.own?'Started points from picks':'Points from picks'}</th>${D.mode==='noprice'?'<th>Top scorer</th>':'<th>Best pick</th><th>Worst early pick</th>'}</tr></thead><tbody>${D.teams.map(t=>{const b=t.picks.filter(r=>r.scored).sort((a,b)=>b.value-a.value)[0], w=t.picks.filter(r=>r.scored&&r.rd<=4).sort((a,b)=>a.value-b.value)[0];
     return `<tr><td class="r num">${t.rank}</td><td class="pin"><b>${esc(S.teams[t.tid].n)}</b><div class="sub">${mg(t.m)}</div></td><td class="r"><span class="grade g-${t.grade[0]}">${t.grade}</span></td>${D.mode==='auction'?`<td class="r num">$${t.spent}</td>`:''}<td class="r num">${f0(t.pts)}</td>${D.mode==='noprice'?(()=>{const x=t.picks.slice().sort((a,b)=>b.pts-a.pts)[0]; return `<td>${esc(pName(x.pid))} <span class="sub">${x.pos} · ${f0(x.pts)} pts</span></td>`;})():`<td>${b?`${esc(pName(b.pid))} <span class="sub">${D.mode==='auction'?'$'+b.bid:'rd '+b.rd} · +${b.value}</span>`:''}</td><td>${w?`${esc(pName(w.pid))} <span class="sub">${D.mode==='auction'?'$'+w.bid:'rd '+w.rd} · ${w.value}</span>`:''}</td>`}</tr>`;}).join('')}</tbody></table></div>`;
   const modeNote=D.mode==='auction'?`Auction draft. Picks are judged by price: a cheap player who finished near the top is a bargain.`:D.mode==='noprice'?`Auction draft. ESPN didn't keep the ${y} prices, so there are no steals or busts this year, and grades come from what each roster scored.`:'';
   return `${head}${modeNote||D.live?`<p class="note" style="margin:-6px 0 0">${modeNote}${D.live?` The ${y} season is still going, so grades use points scored so far.`:''}</p>`:''}
     <div class="card"><div class="head" style="margin-bottom:12px"><h3>${y} Draft</h3><a class="chip" href="#season-${y}">${y} season</a></div>${tiles}</div>
-    <div class="card"><div class="head" style="margin-bottom:12px"><h3>Draft Grades</h3><span class="sub">graded by what the picks did that season</span></div>${grades}</div>
-    <div class="card"><div class="head" style="margin-bottom:12px"><h3>${D.mode==='snake'?'Draft Board':'Auction Board'}</h3><span class="sub"><span class="db-key db-g2"></span> ${D.mode==='auction'?'bargain':'steal'} <span class="db-key db-r2"></span> bust · K = keeper${D.mode==='auction'?' · each team\'s buys, most expensive first, teams in grade order':D.mode==='noprice'?' · each team\'s picks, best season first':D.snake?' · a name in italics means a traded pick':' · columns are pick order within each round'}</span></div>${board}</div>
+    <div class="card"><div class="head" style="margin-bottom:12px"><h3>Draft Grades</h3><span class="sub">${D.own?'graded by points the picks scored in their drafter\'s lineup':'graded by what the picks did that season'}</span></div>${grades}</div>
+    <div class="card"><div class="head" style="margin-bottom:12px"><h3>${D.mode==='snake'?'Draft Board':'Auction Board'}</h3><span class="sub"><span class="db-key db-g2"></span> ${D.mode==='auction'?'bargain':'steal'} <span class="db-key db-r2"></span> bust · K = keeper${D.mode==='auction'?' · each team\'s buys, most expensive first, teams in grade order':D.mode==='noprice'?' · each team\'s picks, best season first':D.snake?' · a name in italics means a traded pick':' · columns are pick order within each round'}</span></div>${board}${mob}</div>
+    ${D.mode==='auction'?auctionCard(D,S):''}
     ${draftMethod()}`;
 }
-const draftMethod=()=>`<details class="how card"><summary>How picks and drafts are graded</summary><p class="note">Each player's value is his season points above a replacement-level starter at his position (the 12th QB, TE, K and D/ST and about the 30th RB and WR in a 12-team year). Players are ranked by that value, and a pick's score is where he was drafted minus where he finished: a player taken 90th among QBs, RBs, WRs and TEs who finished 10th is +80. From 2024 the league used an auction, so in auction years "taken 90th" means the 90th-highest price, and "rounds" are price tiers of one pick per team. A draft's grade comes from the total value its picks produced, ranked against the rest of the league that year. Kickers and defenses are left out of pick scores and grades, since everyone takes them late. It measures what happened, not whether the pick was smart in August.</p></details>`;
+const draftMethod=()=>`<details class="how card"><summary>How picks and drafts are graded</summary><p class="note">Each player's value is his season points above a replacement-level starter at his position (the 12th QB, TE, K and D/ST and about the 30th RB and WR in a 12-team year). Players are ranked by that value, and a pick's score is where he was drafted minus where he finished: a player taken 90th among QBs, RBs, WRs and TEs who finished 10th is +80. From 2024 the league used an auction, so in auction years "taken 90th" means the 90th-highest price, and "rounds" are price tiers of one pick per team. A draft's grade comes from the total value its picks produced, ranked against the rest of the league that year. From 2018 on, it only counts points the picks scored in the drafting team's starting lineup, so a player traded or cut early doesn't help the team that drafted him. Kickers and defenses are left out of pick scores and grades, since everyone takes them late. It measures what happened, not whether the pick was smart in August.</p></details>`;
+
+function auctionCard(D,S){
+  const posC={QB:'#c8102e',RB:'#1d2a52',WR:'#b8902a',TE:'#3a7d5c',K:'#8a8fa3','D/ST':'#5b6274'}, P=['QB','RB','WR','TE','K','D/ST'];
+  const rows=D.teams.slice().map(t=>{const sp={}; P.forEach(p=>sp[p]=0); t.picks.forEach(r=>sp[r.pos]=(sp[r.pos]||0)+r.bid); const tot=Math.max(1,t.spent); const top3=t.picks.map(r=>r.bid).sort((a,b)=>b-a).slice(0,3); return {t,sp,tot,top3:sum(top3)/tot,fin:S.teams[t.tid].f||S.teams[t.tid].seed};}).sort((a,b)=>b.top3-a.top3);
+  const qs=rows.map(r=>r.top3).sort((a,b)=>a-b), q1=qs[Math.floor(qs.length/3)], q2=qs[Math.floor(2*qs.length/3)];
+  const style=x=>x>=q2?'Stars and scrubs':x>=q1?'Top-heavy':'Balanced';
+  const done=!D.live; const corr=(()=>{const xs=rows.map(r=>r.top3), ys=rows.map(r=>r.fin); if(!done||ys.some(v=>!v)) return ''; const mx=avg(xs), my=avg(ys); const c=sum(xs.map((x,i)=>(x-mx)*(ys[i]-my)))/Math.sqrt(sum(xs.map(x=>(x-mx)**2))*sum(ys.map(v=>(v-my)**2))); return Math.abs(c)<.2?'This year, how concentrated a team spent had little to do with where it finished.':c<0?'This year, teams that spent more on their top three buys tended to finish higher.':'This year, the more balanced builds tended to finish higher.';})();
+  return `<div class="card"><div class="head" style="margin-bottom:10px"><h3>Auction Strategy</h3><span class="sub">${P.map(p=>`<span style="color:${posC[p]}">■</span> ${p}`).join(' ')}</span></div>
+    <div class="rec-list">${rows.map(r=>`<div class="rec-row" style="grid-template-columns:160px 1fr 150px"><span>${mlink(r.t.m,M[r.t.m]?.short)}<div class="sub">${S.complete?ord(r.fin)+' place':'seed '+S.teams[r.t.tid].seed}</div></span><span class="as-bar">${P.map(p=>r.sp[p]?`<i style="width:${r.sp[p]/r.tot*100}%;background:${posC[p]}" title="${p}: $${r.sp[p]}"></i>`:'').join('')}</span><span class="r"><b>${style(r.top3)}</b><div class="sub">${f0(r.top3*100)}% on top 3 buys</div></span></div>`).join('')}</div>
+    <p class="note">Bars show how each team split its budget by position. The labels compare teams within this draft: the most concentrated third is "stars and scrubs," the least is "balanced."${corr?' '+corr:''}</p></div>`;
+}
+function draftTrends(DM){
+  const ys=Object.keys(DM).map(Number).sort((a,b)=>a-b);
+  const rows=ys.map(y=>{const D=DM[y]; const key=r=>D.mode==='auction'?r.costRank||r.ov:r.ov; const first=p=>{const x=D.rows.filter(r=>r.pos===p).sort((a,b)=>key(a)-key(b))[0]; return x?key(x):null;};
+    const rd1=D.rows.filter(r=>r.rd===1); return {y,mode:D.mode,qb:first('QB'),te:first('TE'),k:first('K'),dst:first('D/ST'),rb1:rd1.filter(r=>r.pos==='RB').length,n:rd1.length,
+      topRB:D.mode==='auction'?Math.max(0,...D.rows.filter(r=>r.pos==='RB').map(r=>r.bid)):null,topWR:D.mode==='auction'?Math.max(0,...D.rows.filter(r=>r.pos==='WR').map(r=>r.bid)):null,topQB:D.mode==='auction'?Math.max(0,...D.rows.filter(r=>r.pos==='QB').map(r=>r.bid)):null};});
+  const TOPY=Math.ceil(Math.max(...rows.flatMap(r=>[r.qb,r.te,r.k]).filter(v=>v!=null))/40)*40;
+  const ch=lineChart({xs:rows.map(r=>r.y),series:[{name:'First QB',color:'var(--accent)',pts:rows.map(r=>[r.y,r.qb])},{name:'First TE',color:'var(--gold)',pts:rows.map(r=>[r.y,r.te])},{name:'First K',color:'var(--muted)',dash:1,pts:rows.map(r=>[r.y,r.k])}],invert:true,yMin:1,yMax:TOPY,yTicks:[1,40,80,120,160,200].filter(v=>v<=TOPY),yFmt:v=>'#'+Math.round(v),h:240});
+  const auc=rows.filter(r=>r.mode==='auction');
+  return `<div class="card"><div class="head" style="margin-bottom:8px"><h3>Draft Trends</h3><span class="sub">pick number when each position first went (price rank in auction years)</span></div>
+    <div class="legend"><span style="--c:var(--accent)">First QB</span><span style="--c:var(--gold)">First TE</span><span style="--c:var(--muted)">First kicker</span></div>${ch}
+    <div class="tblwrap" style="margin-top:10px"><table><thead><tr><th>Season</th><th class="r">First QB</th><th class="r">First TE</th><th class="r">First K</th><th class="r">First D/ST</th><th class="r">RBs in round 1</th>${auc.length?'<th class="r">Top RB price</th><th class="r">Top WR price</th><th class="r">Top QB price</th>':''}</tr></thead><tbody>
+    ${rows.slice().reverse().map(r=>`<tr><td><a class="mgr" href="#draft-${r.y}">${r.y}</a>${r.mode==='auction'?' <span class="sub">auction</span>':''}</td><td class="r num">${r.qb??'–'}</td><td class="r num">${r.te??'–'}</td><td class="r num">${r.k??'–'}</td><td class="r num">${r.dst??'–'}</td><td class="r num">${r.rb1} of ${r.n}</td>${auc.length?(r.mode==='auction'?`<td class="r num">$${r.topRB}</td><td class="r num">$${r.topWR}</td><td class="r num">$${r.topQB}</td>`:'<td></td><td></td><td></td>'):''}</tr>`).join('')}</tbody></table></div>
+    <p class="note">In auction years, round 1 means the 12 most expensive players.</p></div>`;
+}
+
+function vWaivers(){
+  if(!window.HIST) return txNav('waivers')+histWait('Waivers');
+  const H=window.HIST, A0=(H.A||[]).map(a=>({y:a[0],wk:a[1],m:tMgr(a[0],a[2]),pid:a[3],bid:a[4],st:a[5],tot:a[6],n:a[7]})).filter(a=>a.m!=null);
+  // a player picked up more than once by the same team in a season counts once (his first add, with the points that followed)
+  const A=Object.values(A0.reduce((o,a)=>{const k=a.y+'-'+a.m+'-'+a.pid; const p=o[k]; o[k]=p?{...(a.wk<p.wk?a:p),st:Math.max(a.st,p.st),n:Math.max(a.n,p.n),bid:Math.max(a.bid,p.bid)}:a; return o;},{}));
+  const head=`${txNav('waivers')}<div class="head"><div><h2>Waivers &amp; Free Agents</h2></div></div>`;
+  if(!A.length) return head+`<div class="card"><p class="note">No pickups on record.</p></div>`;
+  const AC=(H.AC||[]).map(a=>({y:a[0],m:tMgr(a[0],a[1]),adds:a[2],spent:a[3]})).filter(a=>a.m!=null);
+  const G=Object.values((H.G||[]).map(g=>({y:g[0],wk:g[1],m:tMgr(g[0],g[2]),pid:g[3],to:tMgr(g[0],g[4]),st:g[5],n:g[6]})).filter(g=>g.m!=null&&g.to!=null).reduce((o,g)=>{const k=g.y+'-'+g.m+'-'+g.pid; if(!o[k]||g.wk<o[k].wk) o[k]=g; return o;},{}));
+  const yrs=[...new Set(AC.map(a=>a.y))].sort((a,b)=>a-b), last=yrs[yrs.length-1];
+  const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div><div class="sub">${sub}</div></div>`;
+  const best=A.slice().sort((a,b)=>b.st-a.st), totAdds=sum(AC.map(a=>a.adds));
+  const byM={}; AC.forEach(a=>{const r=byM[a.m]=byM[a.m]||{m:a.m,adds:0,spent:0,yrs:new Set(),st:0,best:null}; r.adds+=a.adds; r.spent+=a.spent; r.yrs.add(a.y);});
+  A.forEach(a=>{const r=byM[a.m]; if(!r) return; r.st+=a.st; if(!r.best||a.st>r.best.st) r.best=a;});
+  const ml=Object.values(byM).sort((a,b)=>b.st-a.st);
+  const most=Object.values(byM).sort((a,b)=>b.adds/b.yrs.size-a.adds/a.yrs.size)[0];
+  const bigBid=A.slice().sort((a,b)=>b.bid-a.bid)[0];
+  const lst=(arr,f,sub)=>`<div class="rec-list">${arr.map((r,i)=>`<div class="rec-row" style="grid-template-columns:22px 1fr auto"><span class="rk">${i+1}</span><span><b>${esc(pName(r.pid))}</b> <span class="sub">${pPos(r.pid)}</span><div class="sub">${sub(r)}</div></span><span class="val">${f(r)}</span></div>`).join('')}</div>`;
+  const when=r=>`<a href="#season-${r.y}">${r.y} Wk ${r.wk}</a>`;
+  const cur=A.filter(a=>a.y===last).sort((a,b)=>b.st-a.st).slice(0,5);
+  const anyBids=A.some(a=>a.bid>0);
+  return `${head}
+    <div class="card"><div class="tiles">
+      ${tile('Pickups since '+yrs[0],totAdds.toLocaleString(),`${f0(totAdds/yrs.length)} a season`)}
+      ${tile('Best pickup ever',f0(best[0].st),`${esc(pName(best[0].pid))} · ${esc(M[best[0].m].short)}, ${best[0].y}`)}
+      ${most?tile('Most active',esc(M[most.m].short),`${f0(most.adds/most.yrs.size)} adds a season`):''}
+      ${anyBids&&bigBid?tile('Biggest bid','$'+bigBid.bid,`${esc(pName(bigBid.pid))} · ${esc(M[bigBid.m].short)}, ${bigBid.y} · ${f0(bigBid.st)} pts`):''}
+    </div></div>
+    <div class="grid2">
+      <div class="card"><div class="head" style="margin-bottom:10px"><h3>Best Pickups Ever</h3><span class="sub">started points after the add</span></div>${lst(best.slice(0,10),r=>f0(r.st),r=>`${mlink(r.m,M[r.m].short)} · ${when(r)}${r.bid?` · $${r.bid}`:''} · ${r.n} starts`)}</div>
+      <div class="card"><div class="head" style="margin-bottom:10px"><h3>The Ones That Got Away</h3><span class="sub">dropped, then started for someone else</span></div>${lst(G.sort((a,b)=>b.st-a.st).slice(0,10),r=>f0(r.st),r=>`${mlink(r.m,M[r.m].short)} dropped him ${when(r)} · ${mlink(r.to,M[r.to].short)} got ${r.n} starts`)}</div>
+    </div>
+    ${cur.length?`<div class="card"><div class="head" style="margin-bottom:10px"><h3>${last} Best Pickups So Far</h3></div><div class="tiles">${cur.map(r=>tile(esc(pName(r.pid)),f0(r.st),`${esc(M[r.m].short)} · Wk ${r.wk}${r.bid?` · $${r.bid}`:''} · ${r.n} starts`)).join('')}</div></div>`:''}
+    <div class="card"><div class="head" style="margin-bottom:10px"><h3>Waiver Wire Report Card</h3><span class="sub">${yrs[0]}–${last}</span></div><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Manager</th><th class="r">Adds</th><th class="r">Per season</th>${anyBids?'<th class="r">Budget spent</th>':''}<th class="r">Started pts from pickups</th><th>Best pickup</th></tr></thead><tbody>
+      ${ml.map((r,i)=>`<tr><td class="r num">${i+1}</td><td class="pin">${mlink(r.m)}</td><td class="r num">${r.adds}</td><td class="r num">${f0(r.adds/r.yrs.size)}</td>${anyBids?`<td class="r num">$${r.spent}</td>`:''}<td class="r num"><b>${f0(r.st)}</b></td><td>${r.best?`${esc(pName(r.best.pid))} <span class="sub">${r.best.y} · ${f0(r.best.st)}</span>`:''}</td></tr>`).join('')}</tbody></table></div>
+      <p class="note">Started points count only what a pickup scored in that manager's lineup for the rest of the season. ESPN keeps waiver records from 2018 on.</p></div>`;
+}
+
+function franchiseDraft(c){
+  if(!window.HIST){ window.needHist(); return `<div class="card"><h3>Draft History</h3><p class="note" style="margin:0">Loading…</p></div>`; }
+  const DM=draftModel(), ys=Object.keys(DM).map(Number).sort((a,b)=>b-a);
+  const mine=ys.map(y=>({y,D:DM[y],t:DM[y].teams.find(t=>t.m===c.i)})).filter(x=>x.t);
+  if(!mine.length) return '';
+  const picks=mine.flatMap(x=>x.t.picks), sc=picks.filter(r=>r.scored);
+  const best=sc.slice().sort((a,b)=>b.value-a.value)[0], bust=sc.filter(r=>r.rd<=3).sort((a,b)=>a.value-b.value)[0];
+  const bands=[[1,2,'Rounds 1–2'],[3,5,'Rounds 3–5'],[6,9,'Rounds 6–9'],[10,99,'Rounds 10+']].map(([lo,hi,l])=>{const ps=sc.filter(r=>r.rd>=lo&&r.rd<=hi); return {l,v:ps.length?avg(ps.map(r=>r.value)):null};}).filter(b=>b.v!=null);
+  const bestBand=bands.slice().sort((a,b)=>b.v-a.v)[0];
+  const As=mine.filter(x=>!x.D.live&&x.t.grade.startsWith('A')).length;
+  const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div><div class="sub">${sub}</div></div>`;
+  return `<div class="card"><div class="head" style="margin-bottom:10px"><h3>Draft History</h3><a class="chip" href="#draft-all">All drafts</a></div>
+    <div class="tiles">
+      ${tile('A grades',As,`in ${mine.filter(x=>!x.D.live).length} drafts`)}
+      ${best?tile('Best pick ever',`+${best.value}`,`${esc(pName(best.pid))}, ${best.y} ${best.bid?'$'+best.bid:'rd '+best.rd}`):''}
+      ${bust?tile('Biggest bust',bust.value,`${esc(pName(bust.pid))}, ${bust.y} ${bust.bid?'$'+bust.bid:'rd '+bust.rd}`):''}
+      ${bestBand?tile('Best range',bestBand.l,`${bestBand.v>0?'+':''}${f0(bestBand.v)} picks per player`):''}
+    </div>
+    <div class="fd-strip">${mine.map(x=>{const top=x.t.picks.slice().sort((a,b)=>x.D.mode==='auction'?b.bid-a.bid:a.ov-b.ov)[0]; return `<a class="fd-y" href="#draft-${x.y}"><span>${x.y}</span><span class="grade g-${x.t.grade[0]}">${x.t.grade}</span><span class="sub">${esc(pName(top.pid))}${x.D.mode==='auction'?' $'+top.bid:''}</span></a>`;}).join('')}</div>
+    <p class="note">Each year shows the draft grade and first pick (or priciest buy).</p></div>`;
+}
+
+function homeTx(){
+  if(!window.HIST){ window.needHist(); return ''; }
+  const H=window.HIST; const tile=(k,v,sub,href)=>`<a class="tile tx-tile" href="${href}"><div class="k">${k}</div><div class="v">${v}</div><div class="sub">${sub}</div></a>`;
+  const t=H.T[H.T.length-1]; let trade='';
+  if(t){const sides=[...new Set(t[3].flatMap(i=>[i[1],i[2]]))].map(tid=>({m:tMgr(t[0],tid),got:t[3].filter(i=>i[2]===tid)})); trade=tile('Latest trade',sides.map(sd=>esc(M[sd.m]?.short||'?')).join(' ⇄ '),`${t[0]} Wk ${t[1]} · ${sides.map(sd=>sd.got.map(i=>esc(pName(i[0]))).join(', ')).join(' for ')}`,'#trades');}
+  const yr=curS.y, ad=(H.A||[]).filter(a=>a[0]===yr).sort((a,b)=>b[5]-a[5])[0];
+  const pick=ad?tile(`${yr} best pickup`,esc(pName(ad[3])),`${esc(M[tMgr(ad[0],ad[2])]?.short||'?')} · ${f0(ad[5])} started pts`,'#waivers'):'';
+  const DM=draftModel(), D=DM[yr]||DM[Math.max(...Object.keys(DM).map(Number))]; const g=D&&D.teams[0];
+  const dr=g?tile(`${D.y} top draft`,`${esc(M[g.m]?.short||'?')} · ${g.grade}`,`${esc(SEASONS[D.y].teams[g.tid].n)}${D.live?' · so far':''}`,'#draft-'+D.y):'';
+  return `<div class="card"><div class="head"><h3>Transactions</h3><a class="chip" href="#draft">Draft, trades &amp; waivers</a></div><div class="tiles">${trade}${pick}${dr}</div></div>`;
+}
 function vTrades(){
   if(!window.HIST) return txNav('trades')+histWait('Trades');
   const H=window.HIST, T=H.T.slice().reverse();
@@ -1859,7 +1975,10 @@ function vTrades(){
   const pairs={}; ev.forEach(e=>{if(e.sides.length<2) return; const k=e.sides.map(s=>s.m).sort().join('-'); pairs[k]=(pairs[k]||0)+1;}); const tp=Object.entries(pairs).sort((a,b)=>b[1]-a[1])[0];
   const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div><div class="sub">${sub}</div></div>`;
   const side=(sd,win)=>`<div class="tr-side ${win?'w':''}"><div class="tr-who">${sd.m!=null?mlink(sd.m,M[sd.m].short):'?'} got${win?' <span class="pill p-po">won the trade</span>':''}</div>${sd.got.map(i=>`<div class="tr-p"><span>${esc(pName(i[0]))} <span class="sub">${pPos(i[0])}</span></span><span class="num">${f1(i[3])}<span class="sub"> in ${i[5]} start${i[5]===1?'':'s'}</span></span></div>`).join('')}<div class="tr-tot"><span>Started points after the trade</span><b class="num">${f1(sd.pts)}</b></div></div>`;
-  const cards=ev.map(e=>`<div class="card tr"><div class="head" style="margin-bottom:10px"><h3>${e.y} · Week ${e.wk}</h3><span class="sub">${e.date?new Date(e.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''}${e.sides.length>1?` · won by ${f1(e.margin)}`:''}</span></div><div class="tr-grid">${e.sides.map((sd,i)=>side(sd,i===0&&e.margin>=1)).join('')}</div></div>`).join('');
+  const tm=[...new Set(ev.flatMap(e=>e.sides.map(sd=>sd.m)).filter(m=>m!=null))].sort((a,b)=>M[a].short.localeCompare(M[b].short));
+  const shown=TRADE_F==='all'?ev:ev.filter(e=>e.sides.some(sd=>sd.m===+TRADE_F));
+  const filt=`<div class="ctrl"><label for="tr-f">Manager</label><select id="tr-f"><option value="all">Everyone</option>${tm.map(m=>`<option value="${m}" ${String(m)===String(TRADE_F)?'selected':''}>${esc(M[m].short)} (${ev.filter(e=>e.sides.some(sd=>sd.m===m)).length})</option>`).join('')}</select></div>`;
+  const cards=shown.map(e=>`<div class="card tr"><div class="head" style="margin-bottom:10px"><h3>${e.y} · Week ${e.wk}</h3><span class="sub">${e.date?new Date(e.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''}${e.sides.length>1?` · won by ${f1(e.margin)}`:''}</span></div><div class="tr-grid">${e.sides.map((sd,i)=>side(sd,i===0&&e.margin>=1)).join('')}</div></div>`).join('');
   return `${head}
     <div class="card"><div class="tiles">
       ${tile('Trades since 2018',ev.length,`${H.T[0][0]}–${H.T[H.T.length-1][0]}`)}
@@ -1870,7 +1989,7 @@ function vTrades(){
     <div class="card"><div class="head" style="margin-bottom:10px"><h3>Career Trade Records</h3><span class="sub">who comes out ahead</span></div><div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Manager</th><th class="r">Trades</th><th class="r">Won</th><th class="r">Lost</th><th class="r">Net started points</th></tr></thead><tbody>
       ${rl.map((r,i)=>`<tr><td class="r num">${i+1}</td><td class="pin">${mlink(r.m)}</td><td class="r num">${r.n}</td><td class="r num">${r.w}</td><td class="r num">${r.l}</td><td class="r num ${r.net>=0?'gm-up':'gm-dn'}">${r.net>=0?'+':''}${f0(r.net)}</td></tr>`).join('')}</tbody></table></div>
       <p class="note">A trade is won by the side whose new players scored more points in their starting lineup for the rest of that season. ESPN only keeps trade records from 2018 on.</p></div>
-    <h3>Every Trade</h3>${cards}`;
+    <div class="head"><h3>Every Trade</h3>${filt}</div>${cards}`;
 }
 function vPlayerRecords(nav){
   const head=`<div class="head"><div><h2>Record Book</h2></div></div>${nav}`;
@@ -2161,6 +2280,7 @@ function vHome(){
     <div class="card"><div class="head"><h3>Closest Title Games</h3><a class="chip" href="#champions">All champions</a></div><div class="rec-list fill">${finals.map(g=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><span class="rk" style="color:var(--ink)">${g.y}</span><span>${mlink(g.win,M[g.win].short)} over ${mlink(g.lose,M[g.lose].short)}<div class="sub num">${f2(g.ws)}–${f2(g.ls)}</div></span><span class="val">${f2(g.margin)}</span></div>`).join('')}</div></div>
     <div class="card"><div class="head"><h3>Title Drought Clock</h3><a class="chip" href="#franchise">Franchises</a></div><div class="rec-list fill">${drought.map(c=>`<div class="rec-row" style="grid-template-columns:1fr auto"><span>${mlink(c.i)}<div class="sub">${c.titles.length?'last title '+c.titles[c.titles.length-1]:'never won · since '+c.years[0]}</div></span><span class="val">${c.curDrought} yrs</span></div>`).join('')}</div></div>
   </div>
+  ${homeTx()}
   <div class="explore">${explore.map(e=>`<a href="${e[0]}"><b>${e[1]}</b><span>${e[2]}</span></a>`).join('')}</div></div>`;
 }
 
@@ -2442,6 +2562,7 @@ function route(){
   else if(h.startsWith('records')){g='records'; html=vRecords(h.split('-')[1]);}
   else if(h.startsWith('draft')){g='tx'; html=vDraft(h.split('-')[1]);}
   else if(h==='trades'){g='tx'; html=vTrades();}
+  else if(h==='waivers'){g='tx'; html=vWaivers();}
   else if(h.startsWith('franchise')){g='franchise'; const p=h.split('-')[1]; html=vFranchise(p==null?null:+p);}
   else if(h==='h2h'){g='h2h'; html=vH2H();}
   else if(h.startsWith('versus')){g='h2h'; const p=h.split('-'); html=vVersus(p[1]||defaultPair()[0],p[2]||defaultPair()[1]);}
@@ -2463,6 +2584,8 @@ function wire(){
   if(va&&vb){ const go=()=>{ if(location.hash.startsWith('#versus')) location.hash=`versus-${va.value}-${vb.value}`; else { document.getElementById('versus').outerHTML=vVersusBody(+va.value,+vb.value,true); wire(); } }; va.onchange=go; vb.onchange=go; }
   [['rf-type','type'],['rf-era','era'],['rf-n','n']].forEach(([id,k])=>{const el=document.getElementById(id); if(el) el.onchange=()=>{REC_F[k]=k==='n'?+el.value:el.value; const y=window.scrollY; route(); window.scrollTo(0,y);};});
   const dry=document.getElementById('dr-y'); if(dry) dry.onchange=()=>{location.hash='draft-'+dry.value;};
+  const trf=document.getElementById('tr-f'); if(trf) trf.onchange=()=>{TRADE_F=trf.value; const y=window.scrollY; route(); window.scrollTo(0,y);};
+  const dbt=document.getElementById('db-team'); if(dbt) dbt.onchange=()=>{document.querySelectorAll('.db-ml').forEach(el=>el.hidden=el.dataset.t!==dbt.value);};
   const ra=document.getElementById('rf-active'); if(ra) ra.onchange=()=>{REC_F.active=ra.checked; const y=window.scrollY; route(); window.scrollTo(0,y);};
   const sm=document.getElementById('st-more'); if(sm) sm.onchange=()=>{STAND_MORE=sm.checked; route();};
   const ha=document.getElementById('h-act'), hp=document.getElementById('h-po');
