@@ -31,6 +31,11 @@ jobs:
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
         run: python3 scripts/update_lineups.py
+      - name: Pull draft, trade and player history
+        env:
+          ESPN_S2: ${{ secrets.ESPN_S2 }}
+          SWID: ${{ secrets.SWID }}
+        run: python3 scripts/update_history.py
       - name: Commit if anything changed
         run: |
           git add data/
