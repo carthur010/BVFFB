@@ -100,6 +100,7 @@ tbody tr:hover{background:var(--soft)}
 .p-miss{background:transparent;color:var(--muted)}
 .p-last{background:var(--bad-bg);color:var(--bad)}
 .p-live{background:var(--accent);color:#fff}
+.p-prog{background:#e3ecfb;color:#2557a7}
 .pos{color:var(--good)} .neg{color:var(--bad)}
 
 /* rafters */
@@ -249,7 +250,7 @@ a.tile.bw:hover{background:var(--line)}
 .s-live{border-top-color:var(--gold)}
 .s-copy{display:flex;flex-direction:column;gap:10px;min-width:0}
 .s-copy h2{font-size:34px}
-.sup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.sup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .sup{background:var(--soft);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:2px;border-top:3px solid var(--line)}
 .sup .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
 .sup .who{font-weight:700;font-size:14px}
@@ -454,6 +455,10 @@ main>.mx-two{gap:22px}
 .mx-warn{background:var(--bad-bg);color:var(--ink);border-left:4px solid var(--bad);border-radius:8px;padding:12px 16px;font-size:14px;line-height:1.5}
 .mx-warn b:first-child{color:var(--bad)}
 details.how{margin-top:10px}details.how summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}details.how p{margin-top:6px}
+.tc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.tc-grid.tc-former{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+@media (max-width:1100px){.tc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.tc-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -730,7 +735,7 @@ C.forEach(c=>{ if(c.seasons===YEARS.length) award(c.i,'iron',`${YEARS[0]}-${CUR}
 const mlink = (i,label) => `<a class="mgr" href="#franchise-${i}">${esc(label||M[i].name)}</a>`;
 function finishPill(t){
   const S=SEASONS[t.y];
-  if(!S.complete) return `<span class="pill p-live">In progress</span>`;
+  if(!S.complete) return `<span class="pill p-prog">In progress</span>`;
   if(t.f===1) return `<span class="pill p-champ">Champion</span>`;
   if(t.f===2) return `<span class="pill p-ru">Runner-up</span>`;
   if(t===S.last) return `<span class="pill p-last">Last place</span>`;
@@ -1350,7 +1355,12 @@ function vVersusBody(ai,bi,embedded){
     ['Win %',c=>c.wp,0,pct],['Points per game',c=>c.ppg,0,f2],['All-Play %',c=>c.apPct,0,pct],
     ['Luck (wins vs expected)',c=>c.luck,0,v=>sgn(v)],['Weekly high scores',c=>c.hiWeeks,0],['Avg finish',c=>c.avgFin,1,f1],['Legacy score',c=>c.legacy,0,f1]];
   const cmp=stats.map(([n,k,asc,fm])=>{const va=k(a),vb=k(b); const fmt=fm||(v=>v); const aw=asc?va<vb:va>vb, bw=asc?vb<va:vb>va;
-    return `<tr><td class="r num" style="${aw?'font-weight:700;color:var(--accent)':''}">${fmt(va)} <span class="sub">#${rankOf(k,a,asc)}</span></td><td style="text-align:center" class="sub">${n}</td><td class="num" style="${bw?'font-weight:700;color:var(--accent)':''}">${fmt(vb)} <span class="sub">#${rankOf(k,b,asc)}</span></td></tr>`;}).join('');
+    return `<div class="mx-tr"><span class="num ${aw?'better':''}">${fmt(va)} <span class="sub">#${rankOf(k,a,asc)}</span></span><span class="k">${n}</span><span class="num ${bw?'better':''}"><span class="sub">#${rankOf(k,b,asc)}</span> ${fmt(vb)}</span></div>`;}).join('');
+  const series=(()=>{const L=h.list; if(L.length<3) return ''; let d=0; const pts=L.map((x,k)=>{d+=x.r==='W'?1:x.r==='L'?-1:0; return [k+1,d,`${x.y} Wk ${x.wk}`];});
+    const mx=Math.max(1,...pts.map(p=>Math.abs(p[1]))), ia=a.m.short[0], ib=b.m.short[0]===ia?b.m.short.slice(0,2):b.m.short[0], lab=v=>v>0?`${ia} +${v}`:v<0?`${ib} +${-v}`:'Even';
+    return `<div class="mx-lbl" style="margin-top:0">Series lead over time</div>${lineChart({xs:pts.map(p=>p[0]),series:[{name:'Series lead',color:'var(--accent)',pts}],yMin:-mx-1,yMax:mx+1,yTicks:[-mx,0,mx],yFmt:v=>lab(Math.round(v)),h:220})}<p class="note" style="margin-top:2px">Meeting 1 is ${L[0].y}. Above the line, ${esc(a.m.short)} (${ia}) leads; below it, ${esc(b.m.short)} (${ib}).</p>`;})();
+  const moments=(()=>{if(!sg.length) return ''; const all=sg.flatMap(x=>[{m:a,s:x.ms,x},{m:b,s:x.os,x}]); const hi=all.slice().sort((p,q)=>q.s-p.s)[0], lo=all.slice().sort((p,q)=>p.s-q.s)[0];
+    return `<div class="mx-lbl">Biggest moments</div><div class="tiles"><div class="tile"><div class="k">Highest score</div><div class="v num">${f2(hi.s)}</div><div class="sub">${esc(hi.m.m.short)}, ${hi.x.y} Wk ${hi.x.wk}</div></div><div class="tile"><div class="k">Lowest score</div><div class="v num">${f2(lo.s)}</div><div class="sub">${esc(lo.m.m.short)}, ${lo.x.y} Wk ${lo.x.wk}</div></div></div>`;})();
   const lucky = a.luck>b.luck?a:b;
   const hist=h.list.slice().reverse().map(x=>({y:x.y,wk:x.wk,po:x.po,ms:x.ms,os:x.os,r:x.r,mt:x.mt,ot:x.ot}));
   const hcols=[
@@ -1373,9 +1383,11 @@ function vVersusBody(ai,bi,embedded){
       ${bigB?`<div class="tile"><div class="k">${esc(b.m.short)} biggest win</div><div class="v num">${sgn(bigB.os-bigB.ms)}</div><div class="sub">${bigB.y} Wk ${bigB.wk}</div></div>`:''}
       ${close?`<div class="tile"><div class="k">Closest game</div><div class="v num">${f2(Math.abs(close.ms-close.os))}</div><div class="sub">${close.y} Wk ${close.wk}</div></div>`:''}
     </div>
-    <h3 style="margin:20px 0 8px">Tale of the Tape</h3>
-    <p class="note" style="margin:0 0 8px">League rank in small type. Who's luckier? ${esc(lucky.name)}, at ${sgn(lucky.luck)} wins over what their All-Play scoring would predict, versus ${sgn((lucky===a?b:a).luck)}.</p>
-    <div class="tblwrap"><table><tbody>${cmp}</tbody></table></div>
+    <div class="h2-grid" style="margin-top:20px"><div>
+      <div class="mx-lbl" style="margin-top:0">Tale of the tape · career</div>
+      <div class="mx-tape"><div class="mx-th"><b>${esc(a.m.short)}</b><span></span><b>${esc(b.m.short)}</b></div>${cmp}</div>
+      <p class="note">League rank in small type. Luckier: ${esc(lucky.m.short)}, ${sgn(lucky.luck)} wins over what their All-Play scoring predicts, vs ${sgn((lucky===a?b:a).luck)}.</p>
+    </div><div>${series}${moments}</div></div>
     <h3 style="margin:20px 0 8px">Matchup History</h3>
     ${h.n?table('t-vs',hcols,hist,'y','desc'):'<p class="note">These two have never met.</p>'}
   </div>`;
@@ -1390,7 +1402,8 @@ function vAch(){
     return `<div class="rec-row" style="grid-template-columns:30px 1fr auto"><span class="badge ${b.type==='f'?'f':b.type==='t'?'t':''}" style="padding:0;border:0"><i>${b.ab}</i></span><span><b>${b.name}</b><div class="sub">${b.d}</div><div class="sub" style="margin-top:3px">${holders.length?holders.slice(0,6).map(c=>`${mlink(c.i,c.m.short)} ${c.badges[b.k].length}`).join(' · '):'Nobody yet'}</div></span><span class="val">${sum(holders.map(c=>c.badges[b.k].length))}</span></div>`;}).join('');
   return `<div class="head"><div><h2>Achievements</h2></div></div>
   <h3>Trophy Case</h3>
-  <div class="grid3">${C.slice().sort((a,b)=>b.titles.length-a.titles.length||a.rank-b.rank).map(card).join('')}</div>
+  <div class="tc-grid">${C.filter(c=>c.active).sort((a,b)=>b.titles.length-a.titles.length||a.rank-b.rank).map(card).join('')}</div>
+  ${C.some(c=>!c.active)?`<h3>Former Members</h3><div class="tc-grid tc-former">${C.filter(c=>!c.active).sort((a,b)=>b.titles.length-a.titles.length||a.rank-b.rank).map(card).join('')}</div>`:''}
   <div class="grid2">
     <div class="card"><h3>Accomplishments</h3><div class="rec-list">${catalog('a')}</div></div>
     <div class="card"><h3>Follies</h3><div class="rec-list">${catalog('f')}</div></div>
@@ -1962,7 +1975,7 @@ function vHome(){
   const hist=YEARS.filter(y=>y<CUR).slice().reverse().map(y=>{const gs=SEASONS[y].games.filter(g=>g.wk===wkNow&&!g.multi); if(!gs.length)return null;
     const top=gs.flatMap(g=>[{m:g.h,t:g.ht,s:g.hs,o:g.a},{m:g.a,t:g.at,s:g.as,o:g.h}]).sort((a,b)=>b.s-a.s)[0];
     const big=gs.filter(g=>!g.tie).sort((a,b)=>b.margin-a.margin)[0]; return {y,top,big,po:gs.some(g=>g.po)};}).filter(Boolean).slice(0,6);
-  const histHtml=hist.map(h=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><span class="rk" style="color:var(--ink)">${h.y}</span><span>${mlink(h.top.m,M[h.top.m].short)} put up <b class="num">${f2(h.top.s)}</b>${h.po?' <span class="pill p-po">Playoffs</span>':''}<div class="sub">Biggest win: ${esc(M[h.big.win].short)} over ${esc(M[h.big.lose].short)} by ${f2(h.big.margin)}</div></span><a class="sub" href="#season-${h.y}">${h.y} ›</a></div>`).join('');
+  const histHtml=hist.map(h=>`<div class="rec-row" style="grid-template-columns:44px 1fr auto"><a class="rk" style="color:var(--ink)" href="#season-${h.y}">${h.y}</a><span>${mlink(h.top.m,M[h.top.m].short)}${h.po?' <span class="pill p-po">Playoffs</span>':''}<div class="sub">${esc(M[h.big.win].short)} beat ${esc(M[h.big.lose].short)} by ${f2(h.big.margin)}</div></span><span class="val num">${f2(h.top.s)}</span></div>`).join('');
   // classic title games & drought
   const finals=DONE.map(y=>SEASONS[y].final).filter(g=>g&&!g.multi).sort((a,b)=>a.margin-b.margin).slice(0,5);
   const drought=ACTIVE.slice().sort((a,b)=>b.curDrought-a.curDrought||a.titles.length-b.titles.length).slice(0,5);
