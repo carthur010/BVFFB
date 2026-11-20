@@ -1772,8 +1772,8 @@ function draftModel(){
     const byPos={}; picks.forEach(p=>{(byPos[pPos(p[3])]=byPos[pPos(p[3])]||[]).push(p[4]);});
     const repPts={}; Object.entries(byPos).forEach(([pos,v])=>{v.sort((a,b)=>b-a); const k=Math.max(1,Math.round((rep[pos]||1)*n)); repPts[pos]=v[Math.min(v.length-1,k-1)];});
     const rows=picks.map(p=>({y,ov:p[0],rd:p[1],tid:p[2],pid:p[3],pts:p[4],keeper:!!p[5],bid:p[6]||0,pos:pPos(p[3]),m:tMgr(y,p[2])}));
-    // BVFFB went to an auction (salary cap) draft in 2023; ESPN only kept prices from 2024 on
-    const mode=rows.some(r=>r.bid>0)?'auction':(y>=2023?'noprice':'snake');
+    // BVFFB went to an auction (salary cap) draft in 2024; earlier drafts were snake
+    const mode=rows.some(r=>r.bid>0)?'auction':(y>=2024?'noprice':'snake');
     if(mode==='auction'){ rows.slice().sort((a,b)=>b.bid-a.bid||a.ov-b.ov).forEach((r,i)=>{r.costRank=i+1; r.rd=Math.ceil((i+1)/n);}); }
     rows.forEach(r=>{r.par=r.pts-(repPts[r.pos]??0); r.skill=!['K','D/ST'].includes(r.pos);});
     // kickers and defenses are drafted late by habit, so value is ranked among QB/RB/WR/TE only
@@ -1844,7 +1844,7 @@ function vDraft(ys){
     <div class="card"><div class="head" style="margin-bottom:12px"><h3>${D.mode==='snake'?'Draft Board':'Auction Board'}</h3><span class="sub"><span class="db-key db-g2"></span> ${D.mode==='auction'?'bargain':'steal'} <span class="db-key db-r2"></span> bust · K = keeper${D.mode==='auction'?' · each team\'s buys, most expensive first, teams in grade order':D.mode==='noprice'?' · each team\'s picks, best season first':D.snake?' · a name in italics means a traded pick':' · columns are pick order within each round'}</span></div>${board}</div>
     ${draftMethod()}`;
 }
-const draftMethod=()=>`<details class="how card"><summary>How picks and drafts are graded</summary><p class="note">Each player's value is his season points above a replacement-level starter at his position (the 12th QB, TE, K and D/ST and about the 30th RB and WR in a 12-team year). Players are ranked by that value, and a pick's score is where he was drafted minus where he finished: a player taken 90th among QBs, RBs, WRs and TEs who finished 10th is +80. From 2023 the league used an auction, so in auction years "taken 90th" means the 90th-highest price, and "rounds" are price tiers of one pick per team. A draft's grade comes from the total value its picks produced, ranked against the rest of the league that year. Kickers and defenses are left out of pick scores and grades, since everyone takes them late. It measures what happened, not whether the pick was smart in August.</p></details>`;
+const draftMethod=()=>`<details class="how card"><summary>How picks and drafts are graded</summary><p class="note">Each player's value is his season points above a replacement-level starter at his position (the 12th QB, TE, K and D/ST and about the 30th RB and WR in a 12-team year). Players are ranked by that value, and a pick's score is where he was drafted minus where he finished: a player taken 90th among QBs, RBs, WRs and TEs who finished 10th is +80. From 2024 the league used an auction, so in auction years "taken 90th" means the 90th-highest price, and "rounds" are price tiers of one pick per team. A draft's grade comes from the total value its picks produced, ranked against the rest of the league that year. Kickers and defenses are left out of pick scores and grades, since everyone takes them late. It measures what happened, not whether the pick was smart in August.</p></details>`;
 function vTrades(){
   if(!window.HIST) return txNav('trades')+histWait('Trades');
   const H=window.HIST, T=H.T.slice().reverse();
