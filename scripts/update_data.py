@@ -25,18 +25,31 @@ NAME_FIX = {
 ID_FIX = {"{B1CC5652-EA20-431A-BC8E-E5BD2EC5D585}": "Nick Mosbaugh"}
 
 
+def cookie_check(e):
+    if isinstance(e, urllib.error.HTTPError) and e.code in (401, 403):
+        sys.exit("ESPN refused the login cookies (HTTP %d). They have probably expired: log in to ESPN, copy espn_s2 and SWID, "
+                 "and update the ESPN_S2 and SWID secrets in GitHub (Settings > Secrets and variables > Actions)." % e.code)
+
+
 def get(url):
     cookie = f"espn_s2={os.environ['ESPN_S2']}; SWID={os.environ['SWID']}"
     req = urllib.request.Request(url, headers={"Cookie": cookie, "User-Agent": "Mozilla/5.0", "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError:
+        raise
 
 
 def season(year):
     try:
         return get(f"{BASE}/seasons/{year}/segments/0/leagues/{LEAGUE_ID}?{VIEWS}")
     except urllib.error.HTTPError:
-        j = get(f"{BASE}/leagueHistory/{LEAGUE_ID}?seasonId={year}&{VIEWS}")
+        try:
+            j = get(f"{BASE}/leagueHistory/{LEAGUE_ID}?seasonId={year}&{VIEWS}")
+        except urllib.error.HTTPError as e:
+            cookie_check(e)
+            raise
         return j[0] if isinstance(j, list) else j
 
 
@@ -57,7 +70,11 @@ def main():
             sys.exit(f"Missing {k}. Copy it from your ESPN cookies.")
     today = datetime.date.today()
     season_year = int(os.environ.get("SEASON") or (today.year if today.month >= 8 else today.year - 1))
-    cur = get(f"{BASE}/seasons/{season_year}/segments/0/leagues/{LEAGUE_ID}?view=mSettings")
+    try:
+        cur = get(f"{BASE}/seasons/{season_year}/segments/0/leagues/{LEAGUE_ID}?view=mSettings")
+    except urllib.error.HTTPError as e:
+        cookie_check(e)
+        raise
     years = sorted(set(cur["status"]["previousSeasons"]) | {cur["seasonId"]})
     raw = {y: season(y) for y in years}
 
@@ -88,7 +105,7 @@ def main():
             teams.append([t["id"], mi(" & ".join(ns)), " ".join(name.split()),
                           t.get("rankCalculatedFinal") or t.get("finalStandingsPosition") or None,
                           t.get("playoffSeed"), rec.get("wins"), rec.get("losses"), rec.get("ties"),
-                          num(r2(rec.get("pointsFor"))), num(r2(rec.get("pointsAgainst")))])
+                          num(r2(rec.get("pointsFor"))), num(r2(rec.get("pointsAgainst"))), t.get("logo") or ""])
         games = []
         for m in j.get("schedule", []):
             h, a = m.get("home") or {}, m.get("away") or {}

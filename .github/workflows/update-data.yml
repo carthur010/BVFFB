@@ -36,6 +36,13 @@ jobs:
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
         run: python3 scripts/update_history.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Safety check (every page must render with the new data)
+        run: |
+          npm install --no-save --silent jsdom@24
+          node scripts/smoke.js
       - name: Commit if anything changed
         run: |
           git add data/

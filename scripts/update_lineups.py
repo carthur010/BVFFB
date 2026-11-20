@@ -10,7 +10,7 @@ backtest (about 6.4 points of error per starter, vs 6.35 for ESPN).
 
 Needs the same ESPN_S2 and SWID cookies as update_data.py.
 """
-import datetime, json, os, sys, urllib.request
+import datetime, json, os, sys, urllib.request, urllib.error
 from pathlib import Path
 
 LEAGUE_ID = int(os.environ.get("LEAGUE_ID", "1068706"))
@@ -27,13 +27,23 @@ INJ_SHORT = {"OUT": "O", "INJURY_RESERVE": "IR", "SUSPENSION": "SSPD", "DOUBTFUL
 DECAY, LAST_SEASON, PRIOR = 0.9, 0.7, 3.0
 
 
+def cookie_check(e):
+    if isinstance(e, urllib.error.HTTPError) and e.code in (401, 403):
+        sys.exit("ESPN refused the login cookies (HTTP %d). They have probably expired: log in to ESPN, copy espn_s2 and SWID, "
+                 "and update the ESPN_S2 and SWID secrets in GitHub (Settings > Secrets and variables > Actions)." % e.code)
+
+
 def get(url, filt=None):
     cookie = f"espn_s2={os.environ['ESPN_S2']}; SWID={os.environ['SWID']}"
     h = {"Cookie": cookie, "User-Agent": "Mozilla/5.0", "Accept": "application/json"}
     if filt:
         h["x-fantasy-filter"] = json.dumps(filt)
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60) as r:
-        return json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        cookie_check(e)
+        raise
 
 
 def main():

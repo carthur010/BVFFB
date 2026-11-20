@@ -26,13 +26,22 @@ BENCH = {20, 21}
 FIRST_BOX_YEAR = 2018
 
 
+def cookie_check(e):
+    if isinstance(e, urllib.error.HTTPError) and e.code in (401, 403):
+        sys.exit("ESPN refused the login cookies (HTTP %d). They have probably expired: log in to ESPN, copy espn_s2 and SWID, "
+                 "and update the ESPN_S2 and SWID secrets in GitHub (Settings > Secrets and variables > Actions)." % e.code)
+
+
 def get(url, filt=None):
     cookie = f"espn_s2={os.environ['ESPN_S2']}; SWID={os.environ['SWID']}"
     h = {"Cookie": cookie, "User-Agent": "Mozilla/5.0", "Accept": "application/json"}
     if filt:
         h["x-fantasy-filter"] = json.dumps(filt)
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=90) as r:
-        j = json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=90) as r:
+            j = json.loads(r.read().decode())
+    except urllib.error.HTTPError:
+        raise
     return j[0] if isinstance(j, list) else j
 
 
@@ -40,7 +49,11 @@ def league(year, query, filt=None):
     try:
         return get(f"{BASE}/seasons/{year}/segments/0/leagues/{LEAGUE_ID}?{query}", filt)
     except urllib.error.HTTPError:
-        return get(f"{BASE}/leagueHistory/{LEAGUE_ID}?seasonId={year}&{query}", filt)
+        try:
+            return get(f"{BASE}/leagueHistory/{LEAGUE_ID}?seasonId={year}&{query}", filt)
+        except urllib.error.HTTPError as e:
+            cookie_check(e)
+            raise
 
 
 def main():
