@@ -779,7 +779,7 @@ GAMES.filter(g=>!g.multi).forEach(g=>{
 C.forEach(c=>{ if(c.seasons===YEARS.length) award(c.i,'iron',`${YEARS[0]}-${CUR}`); });
 
 // ---------- UI primitives ----------
-const tlogo=(t,sz)=>t&&t.logo&&/^https:\/\//.test(t.logo)?`<img class="tlogo" src="${esc(t.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:${sz||22}px;height:${sz||22}px" onerror="this.remove()">`:'';
+const tlogo=(t,sz)=>t&&t.logo&&/^https?:\/\//.test(t.logo)?`<img class="tlogo" src="${esc(t.logo.replace(/^http:/,'https:'))}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:${sz||22}px;height:${sz||22}px" onerror="this.remove()">`:'';
 const mlink = (i,label) => `<a class="mgr" href="#franchise-${i}">${esc(label||M[i].name)}</a>`;
 function finishPill(t){
   const S=SEASONS[t.y];
