@@ -492,6 +492,7 @@ details.how{margin-top:10px}details.how summary{cursor:pointer;font-size:13px;co
 .tlogo{border-radius:50%;object-fit:cover;background:var(--soft);flex:none;vertical-align:middle}
 .tl-row{display:inline-flex;align-items:center;gap:8px}
 .banner .tlogo{display:block;margin:0 auto 4px;border:2px solid rgba(255,255,255,.6)}
+.banner .tlogo.ph{background:transparent;border-color:rgba(255,255,255,.18)}
 .mx-side .tlogo{margin:2px 0}
 .theme-btn{flex:none;margin-left:8px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font-size:16px;cursor:pointer;line-height:1}
 .theme-btn:hover{background:rgba(255,255,255,.12)}
@@ -779,7 +780,7 @@ GAMES.filter(g=>!g.multi).forEach(g=>{
 C.forEach(c=>{ if(c.seasons===YEARS.length) award(c.i,'iron',`${YEARS[0]}-${CUR}`); });
 
 // ---------- UI primitives ----------
-const tlogo=(t,sz)=>t&&t.logo&&/^https?:\/\//.test(t.logo)?`<img class="tlogo" src="${esc(t.logo.replace(/^http:/,'https:'))}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:${sz||22}px;height:${sz||22}px" onerror="this.remove()">`:'';
+const tlogo=(t,sz)=>t&&t.logo&&/^https?:\/\//.test(t.logo)?`<img class="tlogo" src="${esc(t.logo.replace(/^http:/,'https:'))}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:${sz||22}px;height:${sz||22}px" onerror="this.style.visibility='hidden'">`:'';
 const mlink = (i,label) => `<a class="mgr" href="#franchise-${i}">${esc(label||M[i].name)}</a>`;
 function finishPill(t){
   const S=SEASONS[t.y];
@@ -867,7 +868,7 @@ function historyNav(on){
   return `<div class="subtabs">${items.map(([h,l])=>`<a class="chip ${on&&(on===h||(h.startsWith('season')&&on.startsWith('season')))?'on':''}" href="#${h}">${l}</a>`).join('')}</div>`;
 }
 function rafters(wrap){
-  return `<div class="rafters${wrap?' rafters-wrap':''}">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}">${tlogo(t,30)}<span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
+  return `<div class="rafters${wrap?' rafters-wrap':''}">${DONE.slice().reverse().map(y=>{const t=SEASONS[y].champ;return `<a class="banner" href="#season-${y}">${tlogo(t,30)||'<span class="tlogo ph" style="width:30px;height:30px"></span>'}<span class="yr">${y}</span><span class="who">${esc(M[t.m].name)}</span><span class="tm">${esc(t.n)}</span></a>`;}).join('')}</div>`;
 }
 
 let STAND_MORE=false;
