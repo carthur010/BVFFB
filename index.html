@@ -1778,8 +1778,13 @@ function draftModel(){
     rows.forEach(r=>{r.value=r.skill?r.pickRank-r.parRank:0;});
     const teams={}; rows.forEach(r=>{const t=teams[r.tid]=teams[r.tid]||{tid:r.tid,m:r.m,par:0,pts:0,picks:[]}; if(r.skill) t.par+=Math.max(r.par,0); t.pts+=r.pts; t.picks.push(r);});
     const tl=Object.values(teams).sort((a,b)=>b.par-a.par); tl.forEach((t,i)=>{t.rank=i+1; const q=tl.length>1?(tl.length-1-i)/(tl.length-1):1; t.grade=q>=.9?'A+':q>=.75?'A':q>=.6?'B+':q>=.45?'B':q>=.3?'C+':q>=.15?'C':'D';});
-    const order=rows.filter(r=>r.rd===1).sort((a,b)=>a.ov-b.ov).map(r=>r.tid);
-    DRAFTS[y]={y,rows,teams:tl,order,rounds:Math.max(...rows.map(r=>r.rd)),live:!S.complete};});
+    // board slots: position within the round, snake order (picks can be traded, so slot != team)
+    const nT=rows.filter(r=>r.rd===1).length; const rounds=Math.max(...rows.map(r=>r.rd));
+    const rt=rd=>rows.filter(r=>r.rd===rd).sort((a,b)=>a.ov-b.ov).map(r=>r.tid), r1=rt(1), r2=rt(2);
+    const snake=new Set(r1).size===r1.length&&r2.join()===r1.slice().reverse().join();
+    for(let rd=1;rd<=rounds;rd++){const rr=rows.filter(r=>r.rd===rd).sort((a,b)=>a.ov-b.ov); rr.forEach((r,k)=>{r.slot=snake&&rd%2===0?nT-1-k:k;});}
+    const order=snake?r1:null;
+    DRAFTS[y]={y,rows,teams:tl,order,snake,nT,rounds,live:!S.complete};});
   return DRAFTS;
 }
 function vDraft(ys){
@@ -1820,14 +1825,15 @@ function vDraft(ys){
     ${tile('Worst draft',worst.grade,`${mg(worst.m)} · ${esc(S.teams[worst.tid].n)}`)}
     ${first?tile('No. 1 pick',`#${first.parRank}`,`${esc(pName(first.pid))} finished ${ord(first.parRank)} in value · ${mg(first.m)}`):''}</div>`;
   const cls=r=>!r.skill?'':r.value>=24?'db-g2':r.value>=8?'db-g1':r.value<=-24?'db-r2':r.value<=-8?'db-r1':'';
-  const board=`<div class="db-wrap"><div class="db" style="grid-template-columns:44px repeat(${D.order.length},minmax(96px,1fr))"><div></div>${D.order.map(tid=>`<div class="db-h">${esc(M[tMgr(y,tid)]?.short||'?')}</div>`).join('')}
-    ${Array.from({length:D.rounds},(_,i)=>i+1).map(rd=>`<div class="db-rd">R${rd}</div>${D.order.map(tid=>{const r=D.rows.find(x=>x.rd===rd&&x.tid===tid); return r?`<div class="db-c ${cls(r)}" title="${esc(pName(r.pid))} · pick ${r.ov} · ${f1(r.pts)} pts${r.skill?` · finished ${ord(r.parRank)} in value`:''}"><b>${esc(pName(r.pid))}</b><span>${r.pos} · ${f0(r.pts)}${r.keeper?' · K':''}</span></div>`:'<div class="db-c"></div>';}).join('')}`).join('')}</div></div>`;
+  const cols=Array.from({length:D.nT},(_,i)=>i);
+  const board=`<div class="db-wrap"><div class="db" style="grid-template-columns:44px repeat(${D.nT},minmax(96px,1fr))"><div></div>${cols.map(si=>`<div class="db-h">${D.snake?esc(M[tMgr(y,D.order[si])]?.short||'?'):'Pick '+(si+1)}</div>`).join('')}
+    ${Array.from({length:D.rounds},(_,i)=>i+1).map(rd=>`<div class="db-rd">R${rd}</div>${cols.map(si=>{const tid=D.snake?D.order[si]:null; const r=D.rows.find(x=>x.rd===rd&&x.slot===si); return r?`<div class="db-c ${cls(r)}" title="${esc(pName(r.pid))} · pick ${r.ov} by ${esc(M[r.m]?.short||'?')} · ${f1(r.pts)} pts${r.skill?` · finished ${ord(r.parRank)} in value`:''}"><b>${esc(pName(r.pid))}</b><span>${r.pos} · ${f0(r.pts)}${r.keeper?' · K':''}${!D.snake?` · ${esc(M[r.m]?.short||'?')}`:r.tid!==tid?` · <i>${esc(M[r.m]?.short||'?')}</i>`:''}</span></div>`:'<div class="db-c"></div>';}).join('')}`).join('')}</div></div>`;
   const grades=`<div class="tblwrap"><table><thead><tr><th class="r">#</th><th class="pin">Team</th><th class="r">Grade</th><th class="r">Points from picks</th><th>Best pick</th><th>Worst early pick</th></tr></thead><tbody>${D.teams.map(t=>{const b=t.picks.filter(r=>r.skill).sort((a,b)=>b.value-a.value)[0], w=t.picks.filter(r=>r.skill&&r.rd<=4).sort((a,b)=>a.value-b.value)[0];
     return `<tr><td class="r num">${t.rank}</td><td class="pin"><b>${esc(S.teams[t.tid].n)}</b><div class="sub">${mg(t.m)}</div></td><td class="r"><span class="grade g-${t.grade[0]}">${t.grade}</span></td><td class="r num">${f0(t.pts)}</td><td>${b?`${esc(pName(b.pid))} <span class="sub">rd ${b.rd} · +${b.value}</span>`:''}</td><td>${w?`${esc(pName(w.pid))} <span class="sub">rd ${w.rd} · ${w.value}</span>`:''}</td></tr>`;}).join('')}</tbody></table></div>`;
   return `${head}${D.live?`<p class="note" style="margin:-6px 0 0">The ${y} season is still going, so grades use points scored so far.</p>`:''}
     <div class="card"><div class="head" style="margin-bottom:12px"><h3>${y} Draft</h3><a class="chip" href="#season-${y}">${y} season</a></div>${tiles}</div>
     <div class="card"><div class="head" style="margin-bottom:12px"><h3>Draft Grades</h3><span class="sub">graded by what the picks did that season</span></div>${grades}</div>
-    <div class="card"><div class="head" style="margin-bottom:12px"><h3>Draft Board</h3><span class="sub"><span class="db-key db-g2"></span> steal <span class="db-key db-r2"></span> bust · K = keeper</span></div>${board}</div>
+    <div class="card"><div class="head" style="margin-bottom:12px"><h3>Draft Board</h3><span class="sub"><span class="db-key db-g2"></span> steal <span class="db-key db-r2"></span> bust · K = keeper${D.snake?' · a name in italics means a traded pick':' · columns are pick order within each round'}</span></div>${board}</div>
     ${draftMethod()}`;
 }
 const draftMethod=()=>`<details class="how card"><summary>How picks and drafts are graded</summary><p class="note">Each player's value is his season points above a replacement-level starter at his position (the 12th QB, TE, K and D/ST and about the 30th RB and WR in a 12-team year). Players are ranked by that value, and a pick's score is where he was drafted minus where he finished: a player taken 90th among QBs, RBs, WRs and TEs who finished 10th is +80. A draft's grade comes from the total value its picks produced, ranked against the rest of the league that year. Kickers and defenses are left out of pick scores and grades, since everyone takes them late. It measures what happened, not whether the pick was smart in August.</p></details>`;
