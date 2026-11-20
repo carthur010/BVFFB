@@ -1890,8 +1890,9 @@ function vPlayerRecords(nav){
     </div>
     <div class="grid2">
       <div class="card"><h3>Most Starts for One Manager</h3>${lst(loyal,r=>`${r.starts}`,r=>`${mlink(r.m,M[r.m].short)} · ${[...r.yrs].sort().join(', ')} · ${f0(r.pts)} pts`)}</div>
-      <div class="card"><h3>Franchise Players</h3><p class="note" style="margin:0 0 8px">Each manager's top scorer, starts only.</p>${lst(franchise,r=>f0(r.pts),r=>`${mlink(r.m,M[r.m].short)} · ${r.starts} starts`)}</div>
+      <div class="card"><h3>Most Points for One Manager</h3>${lst(Object.values(career).sort((a,b)=>b.pts-a.pts).slice(0,N),r=>f0(r.pts),r=>`${mlink(r.m,M[r.m].short)} · ${r.starts} starts`)}</div>
     </div>
+    <div class="card"><div class="head" style="margin-bottom:10px"><h3>Franchise Players</h3><span class="sub">each manager's top scorer, starts only</span></div><div class="tiles">${franchise.map(r=>`<div class="tile"><div class="k">${esc(M[r.m].short)}</div><div class="v" style="font-size:18px">${esc(pName(r.pid))}</div><div class="sub">${r.pos} · ${f0(r.pts)} pts in ${r.starts} starts</div></div>`).join('')}</div></div>
     <div class="card"><h3>Best Week by Position</h3><div class="grid4p">${byPos.map(([p,a])=>`<div><div class="mx-lbl" style="margin-top:0">${p}</div>${lst(a,r=>f1(r.pts),wk)}</div>`).join('')}</div></div>`;
 }
 
